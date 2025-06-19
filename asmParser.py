@@ -34,7 +34,7 @@ def tree_to_dict(node, parser):
         return None
 
 if len(sys.argv) < 2:
-    print("Usage: python3 your_script_name.py <input_asm_file>")
+    print("Usage: python3 asmParser.py <input_asm_file>")
     sys.exit(1)
 
 input_filename = sys.argv[1]

@@ -3,6 +3,7 @@ from parser import Parser
 from module_data import ModuleData
 from llvm_generator import LLVMGenerator
 from function_translator import FunctionTranslator
+import sys
 
 def main():
 

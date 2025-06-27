@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union, Tuple
 from dataclasses import dataclass
 
 import llvmlite.ir as ir
@@ -17,6 +17,9 @@ class FunctionContext:
     cf_handler: ControlFlowHandler
     flag_manager: FlagManager
     stack_vars: Dict[int, ir.AllocaInstr]
+    saved_regs: Dict[str, ir.AllocaInstr]
+    stack_frame: Optional[ir.AllocaInstr] = None
+    current_offset: int = 0
 
 
 class FunctionTranslator:
@@ -127,34 +130,28 @@ class FunctionTranslator:
 
     def translate_PUSH(self, instr: InstructionData, context: FunctionContext):
         operand = instr.operands[0]
+        if context.stack_frame is None:
+            return
+        ptr = context.builder.gep(context.stack_frame, [ir.Constant(ir.IntType(32), 0), ir.Constant(ir.IntType(32), context.current_offset)], name=f"stack_{context.current_offset}")
+        ptr = context.builder.bitcast(ptr, ir.PointerType(ir.IntType(64)))
         if operand.type == "register":
-            if operand.register == "RBP":
-                pass
-            else:
-                val = context.reg_manager.get_register_ssa(operand.register, context.builder)
-                rsp = context.reg_manager.get_register_ssa("RSP", context.builder)
-                new_rsp = context.builder.sub(rsp, ir.Constant(ir.IntType(64), 8), name="new_rsp")
-                ptr = context.builder.inttoptr(new_rsp, ir.PointerType(ir.IntType(64)), name="stack_ptr")
-                context.builder.store(val, ptr)
-                context.reg_manager.set_register_ssa("RSP", new_rsp, context.builder)
-        else:
-            raise NotImplementedError("PUSH with non-register operand not yet supported")
-
+            val = context.reg_manager.get_register_ssa(operand.register, context.builder)
+            context.builder.store(val, ptr)
+        elif operand.type == "immediate":
+            val = ir.Constant(ir.IntType(64), operand.immediate)
+            context.builder.store(val, ptr)
+        context.current_offset += 8
 
     def translate_POP(self, instr: InstructionData, context: FunctionContext):
         operand = instr.operands[0]
+        if context.stack_frame is None or context.current_offset <= 0:
+            return
+        context.current_offset -= 8
         if operand.type == "register":
-            if operand.register == "RBP":
-                pass
-            else:
-                rsp = context.reg_manager.get_register_ssa("RSP", context.builder)
-                ptr = context.builder.inttoptr(rsp, ir.PointerType(ir.IntType(64)), name="stack_ptr")
-                val = context.builder.load(ptr, name="pop_val")
-                context.reg_manager.set_register_ssa(operand.register, val, context.builder)
-                new_rsp = context.builder.add(rsp, ir.Constant(ir.IntType(64), 8), name="new_rsp")
-                context.reg_manager.set_register_ssa("RSP", new_rsp, context.builder)
-        else:
-            raise NotImplementedError("POP to non-register operand not yet supported")
+            ptr = context.builder.gep(context.stack_frame, [ir.Constant(ir.IntType(32), 0), ir.Constant(ir.IntType(32), context.current_offset)], name=f"stack_{context.current_offset}")
+            ptr = context.builder.bitcast(ptr, ir.PointerType(ir.IntType(64)))
+            val = context.builder.load(ptr, name=f"{operand.register}_restore")
+            context.reg_manager.set_register_ssa(operand.register, val, context.builder)
 
     def translate_AND(self, instr: InstructionData, context: FunctionContext):
         if len(instr.operands) != 2:
@@ -190,42 +187,72 @@ class FunctionTranslator:
         size = dest_type.width
         context.flag_manager.update_flags_after_and(result, size, context.builder)
 
-    def analyze_stack_usage(self, func_data: FunctionData) -> Dict[int, ir.Type]:
-        """Analyze RBP-based memory accesses to determine stack variable offsets."""
-        displacements = set()
+    def analyze_saved_registers(self, func_data: FunctionData) -> List[str]:
+        saved_regs = []
+        entry_block = func_data.blocks[0] if func_data.blocks else None
+        if entry_block:
+            for instr in entry_block.non_terminator_instructions:
+                if instr.opcode.upper() == 'PUSH' and instr.operands[0].type == 'register':
+                    reg = instr.operands[0].register
+                    # Verify it’s popped later (simplified check)
+                    for block in func_data.blocks:
+                        if block.terminator_instruction and block.terminator_instruction.opcode.upper() == 'RET':
+                            for instr in block.non_terminator_instructions:
+                                if (instr.opcode.upper() == 'POP' and
+                                    instr.operands[0].type == 'register' and
+                                    instr.operands[0].register == reg):
+                                    saved_regs.append(reg)
+                                    break
+        return saved_regs
+
+    def analyze_stack_usage(self, func_data: FunctionData) -> int:
+        max_depth = 0
+        current_depth = 0
         for block in func_data.blocks:
             for instr in block.non_terminator_instructions + [block.terminator_instruction]:
                 if instr is None:
                     continue
-                for op in instr.operands:
-                    if op.type == "memory" and op.base == "RBP" and op.displacement is not None:
-                        displacements.add(op.displacement)
-
-        return {disp: ir.IntType(64) for disp in displacements}
-
+                opcode = instr.opcode.upper()
+                if opcode == 'PUSH':
+                    current_depth += 8
+                    max_depth = max(max_depth, current_depth)
+                elif opcode == 'POP':
+                    current_depth = max(0, current_depth - 8)
+                elif opcode == 'SUB' and instr.operands[0].register == 'RSP' and instr.operands[1].type == 'immediate':
+                    current_depth += instr.operands[1].immediate
+                    max_depth = max(max_depth, current_depth)
+        return ((max_depth + 15) // 16) * 16
 
     def translate_function_asm_to_llvm(self, asm_func: FunctionData, func_name: str):
         func = self.create_llvm_function_prototype(func_name, asm_func)
-
-
-        block_map = {}
-        for block in asm_func.blocks:
-            bb = func.append_basic_block(block.label)
-            block_map[block.label] = bb
-
+        block_map = {block.label: func.append_basic_block(block.label) for block in asm_func.blocks}
         entry_bb = block_map[asm_func.blocks[0].label]
-        stack_layout = self.analyze_stack_usage(asm_func)
+
         builder = ir.IRBuilder(entry_bb)
-        stack_vars = {disp: builder.alloca(var_type, name=f"local_{abs(disp)}") for disp, var_type in stack_layout.items()}
+
+        stack_size = self.analyze_stack_usage(asm_func)
+        if stack_size > 0:
+            stack_frame = builder.alloca(ir.ArrayType(ir.IntType(8), stack_size + 15), name="stack_frame")
+            stack_frame_ptr = builder.bitcast(stack_frame, ir.PointerType(ir.IntType(8)))
+            stack_frame_int = builder.ptrtoint(stack_frame_ptr, ir.IntType(64))
+            adjusted_int = builder.add(stack_frame_int, ir.Constant(ir.IntType(64), 15))
+            aligned_int = builder.and_(adjusted_int, ir.Constant(ir.IntType(64), -16))
+            aligned_ptr = builder.inttoptr(aligned_int, ir.PointerType(ir.IntType(8)))
+            aligned_stack_frame = builder.bitcast(aligned_ptr, ir.PointerType(ir.ArrayType(ir.IntType(8), stack_size)))
+        else:
+            aligned_stack_frame = None
+
         context = FunctionContext(
             func=func,
             builder=builder,
             reg_manager=self.reg_manager.fork(),
             cf_handler=self.cf_handler.fork(),
             flag_manager=self.flag_manager.fork(),
-            stack_vars=stack_vars
+            stack_vars={},  # Now used for RBP offsets only
+            saved_regs={}
         )
-
+        context.stack_frame = aligned_stack_frame
+        context.current_offset = 0 if aligned_stack_frame else 0
 
         arg_registers = ["RDI", "RSI", "RDX", "RCX", "R8", "R9"]
         for i, (param, reg) in enumerate(zip(func.args, arg_registers[:len(func.args)])):
@@ -234,14 +261,11 @@ class FunctionTranslator:
             if param_val.type != reg_type:
                 if isinstance(param_val.type, ir.PointerType) and isinstance(reg_type, ir.IntType):
                     param_val = builder.ptrtoint(param_val, reg_type)
-                elif isinstance(param_val.type, ir.IntType) and isinstance(reg_type, ir.PointerType):
-                    param_val = builder.inttoptr(param_val, reg_type)
                 elif param_val.type.width < reg_type.width:
                     param_val = builder.zext(param_val, reg_type)
                 elif param_val.type.width > reg_type.width:
                     param_val = builder.trunc(param_val, reg_type)
             context.reg_manager.set_register_ssa(reg, param_val, builder)
-
 
         successors = {}
 
@@ -260,7 +284,8 @@ class FunctionTranslator:
             if terminator.opcode.upper() == 'JMP':
                 if terminator.operands and terminator.operands[0].type == 'name':
                     target_label = terminator.operands[0].name
-                    successors[block.label].append(target_label)
+                    if target_label in block_map:
+                        successors[block.label].append(target_label)
             elif terminator.opcode.upper() in conditional_jumps:
                 if terminator.operands and terminator.operands[0].type == 'name':
                     target_label = terminator.operands[0].name
@@ -290,32 +315,27 @@ class FunctionTranslator:
 
     def _analyze_return_behavior(self, func_data: FunctionData) -> ir.Type:
         return_type = ir.VoidType()
-
         for block in func_data.blocks:
             terminator = block.terminator_instruction
-            if terminator and terminator.opcode.upper() == 'RET':
-                current_type = ir.VoidType()
-
-                for instr in block.non_terminator_instructions:
-                    if instr.operands and instr.operands[0].type == 'register':
-                        reg = instr.operands[0].register
-                        if reg in ('RAX', 'EAX'):
-
-                            if instr.opcode in ['MOV', 'ADD', 'SUB', 'XOR', 'AND', 'OR', 'LEA',
-                                            'POP', 'INC', 'DEC', 'SHL', 'SHR', 'SAR', 'SAL',
-                                            'SETNE', 'CDQE', 'MOVZX', 'MOVSX']:
+            if terminator:
+                if terminator.opcode.upper() == 'RET':
+                    for instr in block.non_terminator_instructions:
+                        if instr.operands and instr.operands[0].type == 'register':
+                            reg = instr.operands[0].register
+                            if reg in ('RAX', 'EAX'):
                                 size = 64 if reg == 'RAX' else 32
                                 current_type = ir.IntType(size)
-                                break
-
-                if isinstance(current_type, ir.IntType):
-                    if return_type == ir.VoidType() or current_type.width > return_type.width:
-                        return_type = current_type
-
-
-        if func_data.name in ["_start", "deregister_tm_clones", "frame_dummy", "__do_global_dtors_aux"]:
-            return ir.VoidType()
-
+                                if return_type == ir.VoidType() or current_type.width > return_type.width:
+                                    return_type = current_type
+                elif terminator.opcode.upper() == 'JMP' and terminator.operands[0].type == 'name':
+                    target_name = terminator.operands[0].name
+                    if target_name in self.llvm_generator.known_externs:
+                        ext_func_type = self.llvm_generator.known_externs[target_name]
+                        return_type = ext_func_type.return_type
+                    elif target_name in self.module.globals:
+                        func = self.module.globals[target_name]
+                        if isinstance(func, ir.Function):
+                            return_type = func.type.pointee.return_type
         return return_type
 
 
@@ -564,9 +584,37 @@ class FunctionTranslator:
         size = dest_val.type.width
         context.flag_manager.update_flags_after_shr(result, dest_val, shift_val, size, context.builder)
 
+    def translate_SHL(self, instr: InstructionData, context: FunctionContext):
+        if len(instr.operands) != 2:
+            raise ValueError("SHL instruction requires two operands")
+
+        dest, src = instr.operands
+        dest_val = self.resolve_operand(dest, context)
+        shift_val = self.resolve_operand(src, context)
+
+        if dest_val.type != shift_val.type:
+            shift_val = context.builder.zext(shift_val, dest_val.type) if isinstance(shift_val.type, ir.IntType) else shift_val
+
+        result = context.builder.shl(dest_val, shift_val, name="shl_result")
+
+        if dest.type == "register":
+            context.reg_manager.set_register_ssa(dest.register, result, context.builder)
+        elif dest.type == "memory":
+            ptr = self.calculate_memory_address(dest, context)
+            dest_type = self.get_operand_type(dest, context)
+            typed_ptr = context.builder.bitcast(ptr, ir.PointerType(dest_type))
+            context.builder.store(result, typed_ptr)
+        else:
+            raise NotImplementedError(f"SHL destination type {dest.type} not supported")
+
+        size = dest_val.type.width
+        context.flag_manager.update_flags_after_shl(result, dest_val, shift_val, size, context.builder)
+
     def translate_ADD(self, instr: InstructionData, context: FunctionContext):
         dest = instr.operands[0]
         src = instr.operands[1]
+        if dest.type == "register" and dest.register == "RSP" and src.type == "immediate":
+            return
         dest_type = self.get_operand_type(dest, context)
         lhs = self.resolve_operand(dest, context)
         rhs = self.resolve_operand(src, context, expected_type=dest_type)
@@ -586,6 +634,9 @@ class FunctionTranslator:
         if len(instr.operands) != 2:
             raise ValueError("SUB instruction requires two operands")
         dest, src = instr.operands
+        if dest.type == "register" and dest.register == "RSP" and src.type == "immediate":
+            context.current_offset += src.immediate
+            return
         dest_type = self.get_operand_type(dest, context)
 
 
@@ -834,8 +885,26 @@ class FunctionTranslator:
 
         extended_val = context.builder.zext(src_val, dest_type, name=f"{dest_reg}_zext")
 
-
         context.reg_manager.set_register_ssa(dest_reg, extended_val, context.builder)
+
+    def translate_MOVAPS(self, instr: InstructionData, context: FunctionContext):
+        dest, src = instr.operands
+
+        # Get source value (XMM register)
+        if src.type == "register" and src.register.startswith("XMM"):
+            src_val = context.reg_manager.get_register_ssa(src.register, context.builder)
+        else:
+            raise NotImplementedError("MOVAPS source must be XMM register in this context")
+
+        # Store to memory (stack relative to RBP)
+        if dest.type == "memory":
+            ptr = self.calculate_memory_address(dest, context)
+            # Cast to pointer of vector type with 16-byte alignment
+            vec_ptr = context.builder.bitcast(ptr, ir.PointerType(ir.VectorType(ir.FloatType(), 4)))
+            store_inst = context.builder.store(src_val, vec_ptr)
+            store_inst.align = 16  # MOVAPS requires 16-byte alignment
+        else:
+            raise NotImplementedError("MOVAPS destination type not supported")
 
     def get_operand_type(self, operand: OperandData, context: FunctionContext) -> ir.Type:
         if operand.type == "register":
@@ -895,7 +964,9 @@ class FunctionTranslator:
             return context.builder.load(typed_ptr)
         elif operand.type == "name":
             name = operand.name
-            if operand.relocation == "..plt":
+            if name in self.llvm_generator.known_globals:
+                return self.module.get_global(name)
+            elif operand.relocation == "..plt":
                 func = self.module.get_global(name)
                 if not func:
                     func_type = ir.FunctionType(ir.IntType(64), [ir.IntType(64)] * 6)
@@ -920,6 +991,25 @@ class FunctionTranslator:
 
 
     def calculate_memory_address(self, operand: OperandData, context: FunctionContext):
+        if operand.type == "memory" and operand.base == "RSP" and operand.displacement is not None and context.stack_frame:
+            offset = context.current_offset + operand.displacement
+            return context.builder.gep(context.stack_frame, [ir.Constant(ir.IntType(32), 0), ir.Constant(ir.IntType(32), offset)], inbounds=True)
+        if operand.base in ['FS', 'GS']:
+            seg_name = f"__{operand.base.lower()}_base"
+            seg_var = self.module.globals.get(seg_name)
+            if not seg_var:
+                seg_var = ir.GlobalVariable(
+                    self.module,
+                    ir.IntType(64),
+                    name=seg_name
+                )
+                seg_var.linkage = 'external'
+            seg_base = context.builder.load(seg_var, name=f"{operand.base}_base")
+            if operand.displacement is not None:
+                addr = context.builder.add(seg_base, ir.Constant(ir.IntType(64), operand.displacement))
+            else:
+                addr = seg_base
+            return context.builder.inttoptr(addr, ir.PointerType(ir.IntType(8)))
 
         if operand.type == "memory" and operand.base == "RBP" and operand.displacement in context.stack_vars:
             return context.stack_vars[operand.displacement]
@@ -934,7 +1024,6 @@ class FunctionTranslator:
             return got_var
 
         elif operand.is_rip_relative:
-
             if operand.name in self.module_data.label_to_section_offset:
                 section_name, label_offset = self.module_data.label_to_section_offset[operand.name]
                 if section_name in self.llvm_generator.section_globals:
@@ -947,12 +1036,7 @@ class FunctionTranslator:
 
                 global_var = self.module.get_global(operand.name)
                 if global_var:
-
-                    if isinstance(global_var, ir.Function):
-                        return global_var
-
-                    return context.builder.gep(global_var, [ir.Constant(ir.IntType(32), 0),
-                                                        ir.Constant(ir.IntType(32), 0)])
+                    return global_var
                 else:
                     return ir.Constant(ir.PointerType(ir.IntType(8)), None)
 

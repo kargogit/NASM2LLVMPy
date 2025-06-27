@@ -10,6 +10,11 @@ class LLVMGenerator:
         self.global_vars: Dict[str, ir.GlobalVariable] = {}
         self.string_literals: Dict[str, ir.GlobalVariable] = {}
         self.section_globals = {}
+        self.known_globals = {
+            'stdout': ir.PointerType(ir.IntType(8)),
+            'stderr': ir.PointerType(ir.IntType(8)),
+            'optind': ir.IntType(32),
+        }
         self.known_externs = {
 
             '__libc_start_main': ir.FunctionType(
@@ -80,7 +85,6 @@ class LLVMGenerator:
                 self._create_section_global(section)
 
     def create_global_symbols(self, module_data: ModuleData):
-        """Create external global variables for non-function global symbols."""
         for symbol in module_data.global_symbols:
             if symbol not in module_data.functions and symbol not in self.module.globals:
                 global_var = ir.GlobalVariable(
@@ -213,17 +217,24 @@ class LLVMGenerator:
             md_node.add(md_entry)
 
     def declare_externals(self, module_data: ModuleData):
-
-        for symbol in module_data.extern_symbols:
-            if symbol in self.module.globals:
-                continue
-
-
-            func_type = self.known_externs.get(symbol,
-                ir.FunctionType(ir.IntType(64), [ir.IntType(64)], var_arg=True))
-
-            func = ir.Function(self.module, func_type, name=symbol)
-            func.linkage = 'external'
+            for symbol in module_data.extern_symbols:
+                if symbol in self.module.globals:
+                    continue
+                if symbol in self.known_globals:
+                    global_var = ir.GlobalVariable(
+                        self.module,
+                        self.known_globals[symbol],
+                        name=symbol
+                    )
+                    global_var.linkage = 'external'
+                    global_var.align = 8
+                else:
+                    func_type = self.known_externs.get(
+                        symbol,
+                        ir.FunctionType(ir.IntType(64), [ir.IntType(64)], var_arg=True)
+                    )
+                    func = ir.Function(self.module, func_type, name=symbol)
+                    func.linkage = 'external'
 
     def _get_priority_from_label(self, label: str) -> int:
         parts = label.split('.')

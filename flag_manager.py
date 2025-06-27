@@ -184,6 +184,30 @@ class FlagManager:
 
         self.current_flags.update({'ZF': zf, 'SF': sf, 'CF': cf, 'OF': of})
 
+    def update_flags_after_shl(self, result: ir.Value, original: ir.Value, shift_val: ir.Value, size: int, builder: ir.IRBuilder):
+        int_type = ir.IntType(size)
+
+        zf = builder.icmp_unsigned('==', result, ir.Constant(int_type, 0))
+
+        sf = builder.icmp_signed('<', result, ir.Constant(int_type, 0))
+
+        cf = ir.Constant(ir.IntType(1), 0)
+        if isinstance(shift_val, ir.Constant) and isinstance(shift_val.constant, int):
+            shift_count = shift_val.constant
+            if 0 < shift_count <= size:
+                bit_pos = size - shift_count
+                mask = 1 << bit_pos
+                masked = builder.and_(original, ir.Constant(int_type, mask))
+                cf = builder.icmp_unsigned('!=', masked, ir.Constant(int_type, 0))
+
+        of = ir.Constant(ir.IntType(1), 0)
+        if isinstance(shift_val, ir.Constant) and shift_val.constant == 1:
+            original_msb = builder.icmp_signed('<', original, ir.Constant(int_type, 0))
+            result_msb = builder.icmp_signed('<', result, ir.Constant(int_type, 0))
+            of = builder.icmp_unsigned('!=', original_msb, result_msb)
+
+        self.current_flags.update({'ZF': zf, 'SF': sf, 'CF': cf, 'OF': of})
+
     def compute_flag(self, flag_name: str, builder: ir.IRBuilder, reg_manager) -> ir.Value:
         return self.current_flags.get(flag_name, ir.Constant(ir.IntType(1), 0))
 

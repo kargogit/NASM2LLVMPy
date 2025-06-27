@@ -6,6 +6,23 @@ class RegisterManager:
 
     register_info = {
 
+        'XMM0': {'size': 128, 'parent': None, 'offset': 0},
+        'XMM1': {'size': 128, 'parent': None, 'offset': 0},
+        'XMM2': {'size': 128, 'parent': None, 'offset': 0},
+        'XMM3': {'size': 128, 'parent': None, 'offset': 0},
+        'XMM4': {'size': 128, 'parent': None, 'offset': 0},
+        'XMM5': {'size': 128, 'parent': None, 'offset': 0},
+        'XMM6': {'size': 128, 'parent': None, 'offset': 0},
+        'XMM7': {'size': 128, 'parent': None, 'offset': 0},
+        'XMM8': {'size': 128, 'parent': None, 'offset': 0},
+        'XMM9': {'size': 128, 'parent': None, 'offset': 0},
+        'XMM10': {'size': 128, 'parent': None, 'offset': 0},
+        'XMM11': {'size': 128, 'parent': None, 'offset': 0},
+        'XMM12': {'size': 128, 'parent': None, 'offset': 0},
+        'XMM13': {'size': 128, 'parent': None, 'offset': 0},
+        'XMM14': {'size': 128, 'parent': None, 'offset': 0},
+        'XMM15': {'size': 128, 'parent': None, 'offset': 0},
+
         'RAX': {'size': 64, 'parent': None, 'offset': 0},
         'RBX': {'size': 64, 'parent': None, 'offset': 0},
         'RCX': {'size': 64, 'parent': None, 'offset': 0},
@@ -22,6 +39,8 @@ class RegisterManager:
         'R13': {'size': 64, 'parent': None, 'offset': 0},
         'R14': {'size': 64, 'parent': None, 'offset': 0},
         'R15': {'size': 64, 'parent': None, 'offset': 0},
+        'FS': {'size': 64, 'parent': None, 'offset': 0},
+        'GS': {'size': 64, 'parent': None, 'offset': 0},
 
 
         'EAX': {'size': 32, 'parent': 'RAX', 'offset': 0},
@@ -104,9 +123,13 @@ class RegisterManager:
             arg_registers = ["RDI", "RSI", "RDX", "RCX", "R8", "R9"]
 
             for reg in self.register_info:
+                if reg.startswith('XMM'):
+                    self.current_registers[reg] = ir.Constant(ir.VectorType(ir.FloatType(), 4), [0.0, 0.0, 0.0, 0.0])
+                else:
+                    self.current_registers[reg] = ir.Constant(self.get_register_type(reg), 0)
 
 
-                self.current_registers[reg] = ir.Constant(self.get_register_type(reg), 0)
+
 
 
             for i, param in enumerate(func.args):
@@ -143,7 +166,10 @@ class RegisterManager:
                 self.current_registers[reg] = pred_values[0] if pred_values else ir.Constant(self.get_register_type(reg), 0)
 
     def get_register_type(self, reg_name: str) -> ir.Type:
-        return ir.IntType(self.register_info[reg_name]['size'])
+        size = self.register_info[reg_name]['size']
+        if size == 128:
+            return ir.VectorType(ir.FloatType(), 4)  # 4 x float32
+        return ir.IntType(size)
 
 
     def get_register_ssa(self, reg_name: str, builder: ir.IRBuilder) -> ir.Value:

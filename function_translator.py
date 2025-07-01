@@ -440,10 +440,13 @@ class FunctionTranslator:
 
         if dest.type == "register":
             context.reg_manager.set_register_ssa(dest.register, src_val, context.builder)
+        #POTENTIALLY PROBLEMATIC BLOCK BEGINS
         elif dest.type == "memory":
             ptr = self.calculate_memory_address(dest, context)
             typed_ptr = context.builder.bitcast(ptr, ir.PointerType(dest_type))
             context.builder.store(src_val, typed_ptr)
+        #POTENTIALLY PROBLEMATIC BLOCK ENDS
+
 
     def translate_XOR(self, instr: InstructionData, context: FunctionContext):
         dest, src = instr.operands
@@ -860,7 +863,7 @@ class FunctionTranslator:
             raise ValueError(f"Expected memory operand, got {operand.type}: {operand}")
 
         # Stack variable optimization for RBP or RSP base
-        if operand.base in ["RBP", "RSP"] and operand.index is None and operand.scale is None:
+        if operand.base in ["RBP", "RSP"] and operand.index is None:
             base_val = context.reg_manager.get_register_ssa(operand.base, context.builder)
             if operand.displacement in context.stack_vars:
                 alloca = context.stack_vars[operand.displacement]
@@ -903,6 +906,7 @@ class FunctionTranslator:
             disp = ir.Constant(ir.IntType(64), operand.displacement)
             effective_address = context.builder.add(effective_address, disp)
 
+        #POTENTIALLY PROBLEMATIC BLOCK BEGINS
         if effective_address:
             # Apply segment base if present
             segment_base = (context.reg_manager.get_register_ssa(operand.segment, context.builder)
@@ -911,6 +915,7 @@ class FunctionTranslator:
             total_address = context.builder.add(segment_base, effective_address)
             access_type = self.get_operand_type(operand, context)
             return context.builder.inttoptr(total_address, ir.PointerType(access_type))
+        #POTENTIALLY PROBLEMATIC BLOCK ENDS
 
         # RIP-relative addressing
         if operand.is_rip_relative:

@@ -108,7 +108,6 @@ class ControlFlowHandler:
         if target.type == "register":
             func_ptr = context.reg_manager.get_register_ssa(target.register, context.builder)
             func_type = ir.FunctionType(ir.IntType(64), [ir.IntType(64)] * 6)
-            context.builder.add(ir.Constant(ir.IntType(32), 0), ir.Constant(ir.IntType(32), 0), name="nop_marker4")
             func_ptr_typed = context.builder.inttoptr(func_ptr, ir.PointerType(func_type))
             args = [context.reg_manager.get_register_ssa(reg, context.builder) for reg in arg_regs]
             call_result = context.builder.call(func_ptr_typed, args, name="indirect_call")
@@ -136,7 +135,6 @@ class ControlFlowHandler:
                     expected_type = func.function_type.args[i]
                     if arg_val.type != expected_type:
                         if isinstance(expected_type, ir.PointerType):
-                            context.builder.add(ir.Constant(ir.IntType(32), 0), ir.Constant(ir.IntType(32), 0), name="nop_marker5")
                             arg_val = context.builder.inttoptr(arg_val, expected_type)
                         elif expected_type.width < arg_val.type.width:
                             arg_val = context.builder.trunc(arg_val, expected_type)
@@ -155,7 +153,6 @@ class ControlFlowHandler:
                     expected_type = func.function_type.args[i]
                     if arg_val.type != expected_type:
                         if isinstance(expected_type, ir.PointerType):
-                            context.builder.add(ir.Constant(ir.IntType(32), 0), ir.Constant(ir.IntType(32), 0), name="nop_marker6")
                             arg_val = context.builder.inttoptr(arg_val, expected_type)
                         elif expected_type.width < arg_val.type.width:
                             arg_val = context.builder.trunc(arg_val, expected_type)
@@ -167,7 +164,6 @@ class ControlFlowHandler:
                     for i in range(6, num_args):
                         offset = 8 * (i - 6)
                         stack_addr = context.builder.add(rsp, ir.Constant(ir.IntType(64), offset))
-                        context.builder.add(ir.Constant(ir.IntType(32), 0), ir.Constant(ir.IntType(32), 0), name="nop_marker7")
                         stack_ptr = context.builder.inttoptr(stack_addr, ir.PointerType(func.function_type.args[i]))
                         arg_val = context.builder.load(stack_ptr, name=f"stack_arg_{i}")
                         args.append(arg_val)
@@ -234,7 +230,6 @@ class ControlFlowHandler:
             rax_val = context.reg_manager.get_register_ssa("RAX", context.builder)
             if rax_val.type != func_return_type:
                 if isinstance(func_return_type, ir.PointerType) and isinstance(rax_val.type, ir.IntType):
-                    context.builder.add(ir.Constant(ir.IntType(32), 0), ir.Constant(ir.IntType(32), 0), name="nop_marker3")
                     rax_val = context.builder.inttoptr(rax_val, func_return_type)
                 elif isinstance(rax_val.type, ir.IntType) and isinstance(func_return_type, ir.IntType):
                     if rax_val.type.width > func_return_type.width:

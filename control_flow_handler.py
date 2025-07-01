@@ -70,10 +70,19 @@ class ControlFlowHandler:
                                 elif arg_type.width > arg_val.type.width:
                                     arg_val = context.builder.zext(arg_val, arg_type)
                             args.append(arg_val)
-                        call_inst = context.builder.call(func, args, tail=True)
+                        call_inst = context.builder.call(func, args)  # Regular call
+                        return_type = context.func.type.pointee.return_type
                         if isinstance(func.type.pointee.return_type, ir.VoidType):
-                            context.builder.ret_void()
+                            if isinstance(return_type, ir.VoidType):
+                                context.builder.ret_void()
+                            else:
+                                context.builder.ret(ir.Constant(return_type, 0))  # Default return
                         else:
+                            if call_inst.type != return_type:
+                                if call_inst.type.width < return_type.width:
+                                    call_inst = context.builder.zext(call_inst, return_type)
+                                else:
+                                    call_inst = context.builder.trunc(call_inst, return_type)
                             context.builder.ret(call_inst)
                     else:
                         context.builder.unreachable()
@@ -93,114 +102,98 @@ class ControlFlowHandler:
 
     def _handle_call(self, instr: InstructionData, context: 'FunctionContext', succ_labels: List[str]):
         target = instr.operands[0]
-
-        is_non_returning = False
-        if target.type == "name" and target.name in self.NON_RETURNING_FUNCTIONS:
-            is_non_returning = True
+        is_non_returning = target.type == "name" and target.name in self.NON_RETURNING_FUNCTIONS
+        arg_regs = ["RDI", "RSI", "RDX", "RCX", "R8", "R9"]
 
         if target.type == "register":
             func_ptr = context.reg_manager.get_register_ssa(target.register, context.builder)
-
-            func_type = ir.FunctionType(ir.IntType(64), [ir.IntType(64)] * 6, var_arg=False)
-
+            func_type = ir.FunctionType(ir.IntType(64), [ir.IntType(64)] * 6)
+            context.builder.add(ir.Constant(ir.IntType(32), 0), ir.Constant(ir.IntType(32), 0), name="nop_marker4")
             func_ptr_typed = context.builder.inttoptr(func_ptr, ir.PointerType(func_type))
-
-            arg_regs = ["RDI", "RSI", "RDX", "RCX", "R8", "R9"]
-            args = []
-
-            for reg in arg_regs:
-                arg_val = context.reg_manager.get_register_ssa(reg, context.builder)
-                args.append(arg_val)
-
-            call_result = context.builder.call(func_ptr_typed, args, name=f"indirect_call")
-
-            context.reg_manager.set_register_ssa("RAX", call_result, context.builder)
-
-            if not is_non_returning:
-                if not succ_labels or len(succ_labels) != 1:
-                    raise ValueError("CALL instruction must have exactly one successor")
-                successor_bb = self._get_block_by_label(context.func, succ_labels[0])
-                context.builder.branch(successor_bb)
-            else:
-                context.builder.unreachable()
-
+            args = [context.reg_manager.get_register_ssa(reg, context.builder) for reg in arg_regs]
+            call_result = context.builder.call(func_ptr_typed, args, name="indirect_call")
+            if not isinstance(func_type.return_type, ir.VoidType):
+                context.reg_manager.set_register_ssa("RAX", call_result, context.builder)
         elif target.type == "name":
             func_name = target.name
-
             func = self.module.get_global(func_name)
             if not func:
-
-                called_function = module_data.functions.get(func_name)
+                # Fallback for internal functions not yet defined
+                called_function = context.func.module.functions.get(func_name)
                 if called_function:
                     param_types = [ir.IntType(64)] * len(called_function.parameter_regs)
                     func_type = ir.FunctionType(ir.IntType(64), param_types)
                     func = ir.Function(self.module, func_type, name=func_name)
-            elif not isinstance(func, ir.Function):
-                raise ValueError(f"Symbol '{func_name}' is not a function")
-
-            arg_regs = ["RDI", "RSI", "RDX", "RCX", "R8", "R9"]
+                else:
+                    raise ValueError(f"Function {func_name} not found")
             args = []
-
+            num_args = len(func.function_type.args)
             if func.function_type.var_arg:
-
-
-                num_fixed_args = len(func.function_type.args)
+                num_fixed_args = num_args
                 for i in range(num_fixed_args):
                     reg = arg_regs[i]
                     arg_val = context.reg_manager.get_register_ssa(reg, context.builder)
                     expected_type = func.function_type.args[i]
-                    if isinstance(expected_type, ir.PointerType) and isinstance(arg_val.type, ir.IntType):
-                        arg_val = context.builder.inttoptr(arg_val, expected_type)
-                    elif isinstance(expected_type, ir.IntType) and isinstance(arg_val.type, ir.IntType):
-                        if expected_type.width < arg_val.type.width:
+                    if arg_val.type != expected_type:
+                        if isinstance(expected_type, ir.PointerType):
+                            context.builder.add(ir.Constant(ir.IntType(32), 0), ir.Constant(ir.IntType(32), 0), name="nop_marker5")
+                            arg_val = context.builder.inttoptr(arg_val, expected_type)
+                        elif expected_type.width < arg_val.type.width:
                             arg_val = context.builder.trunc(arg_val, expected_type)
+                        elif expected_type.width > arg_val.type.width:
+                            arg_val = context.builder.zext(arg_val, expected_type)
                     args.append(arg_val)
-
-                for i in range(num_fixed_args, 6):
+                # For variadic args, pass remaining registers up to 6
+                for i in range(num_fixed_args, min(6, num_fixed_args + 1)):  # Only needed args
                     reg = arg_regs[i]
                     arg_val = context.reg_manager.get_register_ssa(reg, context.builder)
                     args.append(arg_val)
             else:
-
-                num_args = len(func.function_type.args)
-                for i in range(min(6, num_args)):
+                for i in range(min(num_args, 6)):
                     reg = arg_regs[i]
                     arg_val = context.reg_manager.get_register_ssa(reg, context.builder)
                     expected_type = func.function_type.args[i]
-                    if isinstance(expected_type, ir.IntType) and isinstance(arg_val.type, ir.IntType):
-                        if expected_type.width < arg_val.type.width:
+                    if arg_val.type != expected_type:
+                        if isinstance(expected_type, ir.PointerType):
+                            context.builder.add(ir.Constant(ir.IntType(32), 0), ir.Constant(ir.IntType(32), 0), name="nop_marker6")
+                            arg_val = context.builder.inttoptr(arg_val, expected_type)
+                        elif expected_type.width < arg_val.type.width:
                             arg_val = context.builder.trunc(arg_val, expected_type)
-                    elif isinstance(expected_type, ir.PointerType) and isinstance(arg_val.type, ir.IntType):
-                        arg_val = context.builder.inttoptr(arg_val, expected_type)
+                        elif expected_type.width > arg_val.type.width:
+                            arg_val = context.builder.zext(arg_val, expected_type)
                     args.append(arg_val)
                 if num_args > 6:
                     rsp = context.reg_manager.get_register_ssa("RSP", context.builder)
                     for i in range(6, num_args):
                         offset = 8 * (i - 6)
                         stack_addr = context.builder.add(rsp, ir.Constant(ir.IntType(64), offset))
-                        stack_ptr = context.builder.inttoptr(stack_addr, ir.PointerType(ir.IntType(64)))
+                        context.builder.add(ir.Constant(ir.IntType(32), 0), ir.Constant(ir.IntType(32), 0), name="nop_marker7")
+                        stack_ptr = context.builder.inttoptr(stack_addr, ir.PointerType(func.function_type.args[i]))
                         arg_val = context.builder.load(stack_ptr, name=f"stack_arg_{i}")
-                        expected_type = func.function_type.args[i]
-                        if isinstance(expected_type, ir.PointerType) and isinstance(arg_val.type, ir.IntType):
-                            arg_val = context.builder.inttoptr(arg_val, expected_type)
                         args.append(arg_val)
-                if len(args) != len(func.function_type.args):
-                    raise ValueError(f"Argument mismatch: {func_name} expects {len(func.function_type.args)} args, got {len(args)}")
-
             call_result = context.builder.call(func, args, name=f"call_{func_name}")
-
             if not isinstance(func.function_type.return_type, ir.VoidType):
-                context.reg_manager.set_register_ssa("RAX", call_result, context.builder)
-
-            if is_non_returning:
-                context.builder.unreachable()
-            else:
-                if not succ_labels or len(succ_labels) != 1:
-                    raise ValueError("CALL instruction must have exactly one successor")
-                successor_bb = self._get_block_by_label(context.func, succ_labels[0])
-                context.builder.branch(successor_bb)
+                ret_val = call_result
+                if isinstance(func.function_type.return_type, ir.IntType):
+                    if func.function_type.return_type.width < 64:
+                        ret_val = context.builder.sext(ret_val, ir.IntType(64))
+                    elif func.function_type.return_type.width > 64:
+                        ret_val = context.builder.trunc(ret_val, ir.IntType(64))
+                elif isinstance(func.function_type.return_type, ir.PointerType):
+                    ret_val = context.builder.ptrtoint(ret_val, ir.IntType(64))
+                else:
+                    raise NotImplementedError(f"Unsupported return type {func.function_type.return_type}")
+                context.reg_manager.set_register_ssa("RAX", ret_val, context.builder)
         else:
             raise NotImplementedError(f"CALL with target type {target.type} not supported")
+
+        if is_non_returning:
+            context.builder.unreachable()
+        else:
+            if not succ_labels or len(succ_labels) != 1:
+                raise ValueError("CALL instruction must have exactly one successor")
+            successor_bb = self._get_block_by_label(context.func, succ_labels[0])
+            context.builder.branch(successor_bb)
 
     def _handle_jmp(self, instr: InstructionData, context: 'FunctionContext', succ_labels: List[str]):
         target = instr.operands[0]
@@ -238,10 +231,12 @@ class ControlFlowHandler:
         if isinstance(func_return_type, ir.VoidType):
             context.builder.ret_void()
         else:
-
             rax_val = context.reg_manager.get_register_ssa("RAX", context.builder)
             if rax_val.type != func_return_type:
-                if isinstance(rax_val.type, ir.IntType) and isinstance(func_return_type, ir.IntType):
+                if isinstance(func_return_type, ir.PointerType) and isinstance(rax_val.type, ir.IntType):
+                    context.builder.add(ir.Constant(ir.IntType(32), 0), ir.Constant(ir.IntType(32), 0), name="nop_marker3")
+                    rax_val = context.builder.inttoptr(rax_val, func_return_type)
+                elif isinstance(rax_val.type, ir.IntType) and isinstance(func_return_type, ir.IntType):
                     if rax_val.type.width > func_return_type.width:
                         rax_val = context.builder.trunc(rax_val, func_return_type)
                     else:
@@ -252,11 +247,70 @@ class ControlFlowHandler:
         if len(succ_labels) < 2:
             context.builder.unreachable()
             return
+        if context.last_condition is None:
+            raise ValueError(f"No preceding flag-setting instruction for conditional jump {instr.opcode} at {instr}")
 
         true_bb = self._get_block_by_label(context.func, succ_labels[0])
         false_bb = self._get_block_by_label(context.func, succ_labels[1])
-        condition = self._resolve_condition(instr.opcode, context)
-        context.builder.cbranch(condition, true_bb, false_bb)
+        opcode = instr.opcode.upper()
+
+        # Extract last_condition components
+        cond_type, value1, value2 = context.last_condition
+
+        # Generate condition based on jump type and last instruction
+        if cond_type == "CMP":
+            if opcode in ("JE", "JZ"):
+                cond = context.builder.icmp_signed('==', value1, value2, name="cmp_eq")
+            elif opcode in ("JNE", "JNZ"):
+                cond = context.builder.icmp_signed('!=', value1, value2, name="cmp_ne")
+            elif opcode == "JL":
+                cond = context.builder.icmp_signed('<', value1, value2, name="cmp_lt")
+            elif opcode == "JLE":
+                cond = context.builder.icmp_signed('<=', value1, value2, name="cmp_le")
+            elif opcode == "JG":
+                cond = context.builder.icmp_signed('>', value1, value2, name="cmp_gt")
+            elif opcode == "JGE":
+                cond = context.builder.icmp_signed('>=', value1, value2, name="cmp_ge")
+            elif opcode == "JA":
+                cond = context.builder.icmp_unsigned('>', value1, value2, name="cmp_ugt")
+            elif opcode == "JAE":
+                cond = context.builder.icmp_unsigned('>=', value1, value2, name="cmp_uge")
+            elif opcode == "JB":
+                cond = context.builder.icmp_unsigned('<', value1, value2, name="cmp_ult")
+            elif opcode == "JBE":
+                cond = context.builder.icmp_unsigned('<=', value1, value2, name="cmp_ule")
+            else:
+                raise NotImplementedError(f"Unsupported conditional jump opcode {opcode} after CMP")
+        elif cond_type == "TEST":
+            # For TEST, compute the AND result only when needed
+            and_result = context.builder.and_(value1, value2, name="test_result")
+            if opcode in ("JE", "JZ"):
+                cond = context.builder.icmp_signed('==', and_result, ir.Constant(and_result.type, 0), name="test_eq")
+            elif opcode in ("JNE", "JNZ"):
+                cond = context.builder.icmp_signed('!=', and_result, ir.Constant(and_result.type, 0), name="test_ne")
+            else:
+                raise NotImplementedError(f"Unsupported conditional jump opcode {opcode} after TEST")
+        elif cond_type == "ARITH":
+            # For arithmetic instructions, compare result with zero
+            zero = ir.Constant(value1.type, 0)
+            if opcode in ("JE", "JZ"):
+                cond = context.builder.icmp_signed('==', value1, zero, name="arith_eq")
+            elif opcode in ("JNE", "JNZ"):
+                cond = context.builder.icmp_signed('!=', value1, zero, name="arith_ne")
+            elif opcode == "JL":
+                cond = context.builder.icmp_signed('<', value1, zero, name="arith_lt")
+            elif opcode == "JLE":
+                cond = context.builder.icmp_signed('<=', value1, zero, name="arith_le")
+            elif opcode == "JG":
+                cond = context.builder.icmp_signed('>', value1, zero, name="arith_gt")
+            elif opcode == "JGE":
+                cond = context.builder.icmp_signed('>=', value1, zero, name="arith_ge")
+            else:
+                raise NotImplementedError(f"Unsupported conditional jump opcode {opcode} after arithmetic instruction")
+        else:
+            raise ValueError(f"Unknown condition type {cond_type} in last_condition")
+
+        context.builder.cbranch(cond, true_bb, false_bb)
 
     def _resolve_condition(self, opcode: str, context: 'FunctionContext') -> ir.Value:
         flag_type, flag_state = self.CONDITION_MAP[opcode.upper()]

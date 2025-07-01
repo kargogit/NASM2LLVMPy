@@ -4,6 +4,7 @@ from module_data import ModuleData
 from llvm_generator import LLVMGenerator
 from function_translator import FunctionTranslator
 import sys
+#builder.add(ir.Constant(ir.IntType(1), 0), ir.Constant(ir.IntType(1), 0), name="nop14")
 
 def main():
 

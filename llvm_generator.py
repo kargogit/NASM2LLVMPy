@@ -2,6 +2,7 @@ import llvmlite.ir as ir
 from module_data import ModuleData, SectionData
 from typing import Dict, List, Optional, Tuple, Union
 
+
 class LLVMGenerator:
     def __init__(self, module_name: str, target_triple: str = "x86_64-pc-linux-gnu"):
         self.module = ir.Module(name=module_name)
@@ -14,19 +15,13 @@ class LLVMGenerator:
             'stdout': ir.PointerType(ir.IntType(8)),
             'stderr': ir.PointerType(ir.IntType(8)),
             'optind': ir.IntType(32),
+            'stdin': ir.PointerType(ir.IntType(8))
         }
         self.known_externs = {
-
             '__libc_start_main': ir.FunctionType(
                 ir.IntType(32),
                 [
-                    ir.PointerType(ir.FunctionType(
-                        ir.IntType(32),
-                        [ir.IntType(32),
-                        ir.PointerType(ir.PointerType(ir.IntType(8))),
-                        ir.PointerType(ir.PointerType(ir.IntType(8)))
-                        ]
-                    )),
+                    ir.PointerType(ir.FunctionType(ir.IntType(32), [ir.IntType(32), ir.PointerType(ir.PointerType(ir.IntType(8))), ir.PointerType(ir.PointerType(ir.IntType(8)))])),
                     ir.IntType(32),
                     ir.PointerType(ir.PointerType(ir.IntType(8))),
                     ir.PointerType(ir.FunctionType(ir.VoidType(), [])),
@@ -35,24 +30,37 @@ class LLVMGenerator:
                     ir.PointerType(ir.IntType(8))
                 ]
             ),
-
+            'strlen': ir.FunctionType(ir.IntType(64), [ir.PointerType(ir.IntType(8))]),
+            'malloc': ir.FunctionType(ir.PointerType(ir.IntType(8)), [ir.IntType(64)]),
+            'strcpy': ir.FunctionType(ir.PointerType(ir.IntType(8)), [ir.PointerType(ir.IntType(8)), ir.PointerType(ir.IntType(8))]),
+            'strerror': ir.FunctionType(ir.PointerType(ir.IntType(8)), [ir.IntType(32)]),
             'printf': ir.FunctionType(ir.IntType(32), [ir.PointerType(ir.IntType(8))], var_arg=True),
-            'fopen': ir.FunctionType(ir.PointerType(ir.IntType(8)),
-                                    [ir.PointerType(ir.IntType(8)),
-                                    ir.PointerType(ir.IntType(8))]),
+            'fprintf': ir.FunctionType(ir.IntType(32), [ir.PointerType(ir.IntType(8)), ir.PointerType(ir.IntType(8))], var_arg=True),
+            'vfprintf': ir.FunctionType(ir.IntType(32), [ir.PointerType(ir.IntType(8)), ir.PointerType(ir.IntType(8)), ir.PointerType(ir.IntType(8))]),
+            'puts': ir.FunctionType(ir.IntType(32), [ir.PointerType(ir.IntType(8))]),
+            'fopen': ir.FunctionType(ir.PointerType(ir.IntType(8)), [ir.PointerType(ir.IntType(8)), ir.PointerType(ir.IntType(8))]),
             'fclose': ir.FunctionType(ir.IntType(32), [ir.PointerType(ir.IntType(8))]),
-            'feof': ir.FunctionType(ir.IntType(32), [ir.PointerType(ir.IntType(8))]),
-            'getc': ir.FunctionType(ir.IntType(32), [ir.PointerType(ir.IntType(8))]),
+            'fputc': ir.FunctionType(ir.IntType(32), [ir.IntType(32), ir.PointerType(ir.IntType(8))]),
+            'fwrite': ir.FunctionType(ir.IntType(64), [ir.PointerType(ir.IntType(8)), ir.IntType(64), ir.IntType(64), ir.PointerType(ir.IntType(8))]),
+            'fgetc': ir.FunctionType(ir.IntType(32), [ir.PointerType(ir.IntType(8))]),
+            'putchar': ir.FunctionType(ir.IntType(32), [ir.IntType(32)]),
+            '__ctype_b_loc': ir.FunctionType(ir.PointerType(ir.PointerType(ir.IntType(16))), []),
             'exit': ir.FunctionType(ir.VoidType(), [ir.IntType(32)]),
             '__cxa_finalize': ir.FunctionType(ir.VoidType(), [ir.PointerType(ir.IntType(8))]),
-            '__ctype_b_loc': ir.FunctionType(ir.PointerType(ir.PointerType(ir.IntType(16))), []),
+            '__errno_location': ir.FunctionType(ir.PointerType(ir.IntType(32)), []),
             '__gmon_start__': ir.FunctionType(ir.VoidType(), []),
             '_ITM_deregisterTMCloneTable': ir.FunctionType(ir.VoidType(), []),
-            '_ITM_registerTMCloneTable': ir.FunctionType(ir.VoidType(), [])
+            '_ITM_registerTMCloneTable': ir.FunctionType(ir.VoidType(), []),
+            'setlocale': ir.FunctionType(ir.PointerType(ir.IntType(8)), [ir.IntType(32), ir.PointerType(ir.IntType(8))]),
+            'strrchr': ir.FunctionType(ir.PointerType(ir.IntType(8)), [ir.PointerType(ir.IntType(8)), ir.IntType(32)]),
+            'geteuid': ir.FunctionType(ir.IntType(32), []),
+            'getpwuid': ir.FunctionType(ir.PointerType(ir.IntType(8)), [ir.IntType(32)]),
+            'getopt_long': ir.FunctionType(ir.IntType(32), [ir.IntType(32), ir.PointerType(ir.PointerType(ir.IntType(8))), ir.PointerType(ir.IntType(8)), ir.PointerType(ir.IntType(8)), ir.PointerType(ir.IntType(32))]),
+            '__stack_chk_fail': ir.FunctionType(ir.VoidType(), [])
         }
 
     def generate(self, module_data: ModuleData):
-        self.create_tm_clone_stubs()
+        #self.create_tm_clone_stubs()
         self.create_got_entries(module_data)
         self.create_global_variables(module_data)
         self.create_global_symbols(module_data)
@@ -231,7 +239,7 @@ class LLVMGenerator:
                 else:
                     func_type = self.known_externs.get(
                         symbol,
-                        ir.FunctionType(ir.IntType(64), [ir.IntType(64)], var_arg=True)
+                        ir.FunctionType(ir.IntType(64), [ir.IntType(64)] * 6)  # Non-variadic, 6 args
                     )
                     func = ir.Function(self.module, func_type, name=symbol)
                     func.linkage = 'external'
@@ -244,6 +252,7 @@ class LLVMGenerator:
         return 10
 
     def setup_global_ctors(self, module_data: ModuleData):
+        EXCLUDED_CTORS = {'frame_dummy'}
         init_array = next((s for s in module_data.sections if s.name == ".init_array"), None)
         if not init_array:
             return
@@ -253,6 +262,8 @@ class LLVMGenerator:
 
         for size, value, dd_type in init_array.data:
             if isinstance(value, str):
+                if value in EXCLUDED_CTORS:
+                    continue
 
                 priority = 65535
 
@@ -293,6 +304,7 @@ class LLVMGenerator:
         global_ctors.align = 8
 
     def setup_global_dtors(self, module_data: ModuleData):
+        EXCLUDED_DTORS = {'__do_global_dtors_aux'}
         fini_array = next((s for s in module_data.sections if s.name == ".fini_array"), None)
         if not fini_array:
             return
@@ -301,6 +313,8 @@ class LLVMGenerator:
         current_offset = 0
         for size, value, ddtype in fini_array.data:
             if isinstance(value, str):
+                if value in EXCLUDED_DTORS:
+                    continue
                 priority = 65535
                 if current_offset in fini_array.labels:
                     for label in fini_array.labels[current_offset]:

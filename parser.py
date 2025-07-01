@@ -248,6 +248,7 @@ class Parser:
                         operands.append(operand)
         return operands
 
+
     def parse_memory_expression(self, expression: List[Dict]) -> Dict:
         base = index = scale = displacement = name = segment = relocation = None
         is_rip_relative = False
@@ -257,6 +258,9 @@ class Parser:
             if isinstance(part, dict):
                 if "additiveExpression" in part:
                     addSubExpress = part["additiveExpression"]
+                    if "multiplicativeExpression" in addSubExpress[0]:
+                        addSubExpress = addSubExpress[0]["multiplicativeExpression"]
+                        multiply = True
                     if "castExpression" in addSubExpress[0]:
                         firstOperand = addSubExpress[0]["castExpression"][0]
                         if "register" in firstOperand:
@@ -267,8 +271,14 @@ class Parser:
                         if "castExpression" in addSubExpress[2]:
                             secondOperand = addSubExpress[2]["castExpression"][0]
                             if "integer" in secondOperand:
-                                disp = addSubExpress[1][0] + secondOperand["integer"][0][0]
-                                displacement = int(disp, 16 if "0x" in disp else 10)
+                                sign = addSubExpress[1][0]
+                                if sign in ['+', '-']:
+                                    int_str = secondOperand["integer"][0][0]
+                                    num_base = 16 if int_str.startswith("0x") else 10
+                                    value = int(int_str, num_base)
+                                    displacement = value if sign == '+' else -value
+                                elif sign == '*':
+                                    scale = int(secondOperand["integer"][0][0], 16 if "0x" in secondOperand["integer"][0][0] else 10)
                 if "castExpression" in part:
                     castExpression = part["castExpression"][0]
                     if "name" in castExpression:

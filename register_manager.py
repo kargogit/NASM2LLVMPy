@@ -103,8 +103,11 @@ class RegisterManager:
 
     def __init__(self):
         self.current_block: Optional[ir.Block] = None
+        self.predecessors: List[ir.Block] = []  # Store predecessor blocks
         self.current_registers: Dict[str, ir.Value] = {}
         self.exit_registers: Dict[ir.Block, Dict[str, ir.Value]] = {}
+        self.defined_in_block: set = set()
+
 
     def fork(self) -> 'RegisterManager':
         return RegisterManager()
@@ -113,100 +116,100 @@ class RegisterManager:
     def initialize_block(self, block: ir.Block, predecessors: List[ir.Block], builder: ir.IRBuilder):
         self.current_block = block
         self.current_registers = {}
-
-
+        self.defined_in_block = set()
         if not predecessors:
-
-            func = block.parent
-
-
-            arg_registers = ["RDI", "RSI", "RDX", "RCX", "R8", "R9"]
-
+            # Initialize all registers to zero or appropriate constants
             for reg in self.register_info:
                 if reg.startswith('XMM'):
                     self.current_registers[reg] = ir.Constant(ir.VectorType(ir.FloatType(), 4), [0.0, 0.0, 0.0, 0.0])
                 else:
                     self.current_registers[reg] = ir.Constant(self.get_register_type(reg), 0)
-
-
-
-
-
+            func = block.parent
+            arg_registers = ["RDI", "RSI", "RDX", "RCX", "R8", "R9"]
             for i, param in enumerate(func.args):
                 if i < len(arg_registers):
                     reg_name = arg_registers[i]
-
                     param_val = param
                     reg_type = self.get_register_type(reg_name)
                     if param_val.type != reg_type:
-                        param_val = builder.zext(param_val, reg_type)
+                        if isinstance(param_val.type, ir.PointerType) and isinstance(reg_type, ir.IntType):
+                            param_val = builder.ptrtoint(param_val, reg_type)
+                        elif isinstance(param_val.type, ir.IntType) and isinstance(reg_type, ir.IntType):
+                            if param_val.type.width < reg_type.width:
+                                param_val = builder.zext(param_val, reg_type)
+                            elif param_val.type.width > reg_type.width:
+                                param_val = builder.trunc(param_val, reg_type)
                     self.current_registers[reg_name] = param_val
-            return
-
-
-        for reg in self.register_info:
-            pred_values = []
-            unique_values = set()
-
-            for pred in predecessors:
-                if pred in self.exit_registers and reg in self.exit_registers[pred]:
-                    pred_val = self.exit_registers[pred][reg]
-                else:
-
-                    pred_val = ir.Constant(self.get_register_type(reg), 0)
-                pred_values.append(pred_val)
-                unique_values.add(str(pred_val))
-
-            if len(unique_values) > 1:
-                phi = builder.phi(self.get_register_type(reg), name=f"{reg}_phi")
-                for pred, val in zip(predecessors, pred_values):
-                    phi.add_incoming(val, pred)
-                self.current_registers[reg] = phi
-            else:
-                self.current_registers[reg] = pred_values[0] if pred_values else ir.Constant(self.get_register_type(reg), 0)
+                    self.defined_in_block.add(reg_name)
 
     def get_register_type(self, reg_name: str) -> ir.Type:
         size = self.register_info[reg_name]['size']
         if size == 128:
-            return ir.VectorType(ir.FloatType(), 4)  # 4 x float32
+            return ir.VectorType(ir.FloatType(), 4)
         return ir.IntType(size)
 
 
     def get_register_ssa(self, reg_name: str, builder: ir.IRBuilder) -> ir.Value:
-        return self.current_registers.get(reg_name, ir.Constant(self.get_register_type(reg_name), 0))
+        if reg_name in self.defined_in_block or not self.predecessors:
+            return self.current_registers.get(reg_name, ir.Constant(self.get_register_type(reg_name), 0))
+
+        pred_values = []
+        unique_values = set()
+        for pred in self.predecessors:
+            pred_val = (self.exit_registers.get(pred, {}).get(reg_name) or
+                        ir.Constant(self.get_register_type(reg_name), 0))
+            pred_values.append(pred_val)
+            unique_values.add(str(pred_val))  # Use str() to compare IR values
+
+        if len(unique_values) > 1:
+            # Multiple distinct values; create a PHI node
+            with builder.goto_entry_block():
+                phi = builder.phi(self.get_register_type(reg_name), name=f"{reg_name}_phi")
+                for pred, val in zip(self.predecessors, pred_values):
+                    phi.add_incoming(val, pred)
+            self.current_registers[reg_name] = phi
+            return phi
+        else:
+            # Single value across predecessors; no PHI needed
+            value = pred_values[0] if pred_values else ir.Constant(self.get_register_type(reg_name), 0)
+            self.current_registers[reg_name] = value
+            return value
+
 
     def set_register_ssa(self, reg_name: str, value: ir.Value, builder: ir.IRBuilder):
+        reg_type = self.get_register_type(reg_name)
+        if isinstance(value.type, ir.PointerType) and reg_type.width == 64:
+            value = builder.ptrtoint(value, reg_type)
+        elif value.type != reg_type:
+            if isinstance(value.type, ir.IntType):
+                if value.type.width < reg_type.width:
+                    #builder.add(ir.Constant(ir.IntType(1), 0), ir.Constant(ir.IntType(1), 0), name="nop14")
+                    value = builder.zext(value, reg_type)
+                elif value.type.width > reg_type.width:
+                    value = builder.trunc(value, reg_type)
+            else:
+                raise TypeError(f"Expected integer type for {reg_name}, got {value.type}")
+        self.current_registers[reg_name] = value
+        self.defined_in_block.add(reg_name)  # Mark as defined in this block
 
-        if self.register_info[reg_name]['size'] == 64:
-            if isinstance(value.type, ir.PointerType):
-                value = builder.ptrtoint(value, ir.IntType(64))
-            elif isinstance(value.type, ir.IntType) and value.type.width < 64:
-                value = builder.zext(value, ir.IntType(64))
-
-
-
+        # Update parent registers (unchanged)
         current_reg = reg_name
         current_value = value
         while True:
-            self.current_registers[current_reg] = current_value
             parent = self.register_info[current_reg].get('parent')
             if not parent:
                 break
-
-            parent_size = self.register_info[parent]['size']
-            parent_type = ir.IntType(parent_size)
-            offset = self.register_info[current_reg].get('offset')
+            parent_type = self.get_register_type(parent)
+            offset = self.register_info[current_reg].get('offset', 0)
             size = self.register_info[current_reg]['size']
             parent_value = self.current_registers.get(parent, ir.Constant(parent_type, 0))
-            if size == 32 and parent_size == 64:
-                new_parent_value = builder.zext(current_value, parent_type)
-            else:
-                mask = ((1 << size) - 1) << offset
-                mask_val = ir.Constant(parent_type, mask)
-                masked_parent = builder.and_(parent_value, builder.not_(mask_val))
-                extended = builder.zext(current_value, parent_type)
-                shifted = builder.shl(extended, ir.Constant(parent_type, offset))
-                new_parent_value = builder.or_(masked_parent, shifted)
+            mask = (1 << size) - 1
+            masked_parent = builder.and_(parent_value, ir.Constant(parent_type, ~(mask << offset)))
+            #builder.add(ir.Constant(ir.IntType(1), 0), ir.Constant(ir.IntType(1), 0), name="nop15")
+            shifted_value = builder.shl(builder.zext(current_value, parent_type), ir.Constant(parent_type, offset))
+            new_parent_value = builder.or_(masked_parent, shifted_value)
+            self.current_registers[parent] = new_parent_value
+            self.defined_in_block.add(parent)
             current_reg = parent
             current_value = new_parent_value
 

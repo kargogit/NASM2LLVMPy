@@ -21,7 +21,7 @@ class FunctionContext:
     saved_regs: Dict[str, ir.AllocaInstr]
     stack_frame: Optional[ir.AllocaInstr] = None
     current_offset: int = 0
-    last_condition: Optional[Tuple[str, ir.Value, Optional[ir.Value]]] = None  # (type, value1, value2)
+    last_condition: Optional[Tuple[str, ir.Value, Optional[ir.Value]]] = None
 
 
 class FunctionTranslator:
@@ -45,12 +45,10 @@ class FunctionTranslator:
             for instr in instructions:
                 if instr is None:
                     continue
-                # Detect pointer usage in memory operands
                 for op in instr.operands:
                     if op.type == 'register' and op.register in param_registers:
                         if any(o.type == 'memory' and (o.base == op.register or o.index == op.register) for o in instr.operands):
                             usage[op.register]['pointer'] = True
-                        # Detect function pointer usage in CALL
                         elif instr.opcode.upper() == 'CALL' and op == instr.operands[0]:
                             usage[op.register]['pointer'] = True
                         else:
@@ -59,13 +57,13 @@ class FunctionTranslator:
 
         for reg in param_registers:
             if usage[reg]['pointer']:
-                types.append(ir.PointerType(ir.IntType(8)))  # Default to i8* for pointers
+                types.append(ir.PointerType(ir.IntType(8)))
             elif usage[reg]['size'] == 32:
                 types.append(ir.IntType(32))
             else:
                 types.append(ir.IntType(64))
 
-        # Override for special cases like 'main'
+
         if func_data.name == 'main':
             types = [ir.IntType(32), ir.PointerType(ir.PointerType(ir.IntType(8)))] + types[2:]
         return types
@@ -79,12 +77,12 @@ class FunctionTranslator:
                 ir.Function(self.module, ir.FunctionType(ir.VoidType(), []), name=func_name)
             elif func_name == "main":
                 param_types = self.infer_parameter_types(function, function.parameter_regs)
-                func_type = ir.FunctionType(ir.IntType(32), param_types)  # main returns i32
+                func_type = ir.FunctionType(ir.IntType(32), param_types)
                 ir.Function(self.module, func_type, name=func_name)
             else:
                 param_registers = function.parameter_regs
                 param_types = self.infer_parameter_types(function, param_registers)
-                func_type = ir.FunctionType(ir.IntType(64), param_types)  # Default to i64 for others
+                func_type = ir.FunctionType(ir.IntType(64), param_types)
                 ir.Function(self.module, func_type, name=func_name)
 
     def translate_all_functions(self, module_data):
@@ -128,7 +126,6 @@ class FunctionTranslator:
             context.builder.store(result, typed_ptr)
         else:
             raise NotImplementedError(f"AND destination type {dest.type} not supported")
-        # Set last_condition for potential flag usage
         context.last_condition = ("ARITH", result, None)
 
     def analyze_saved_registers(self, func_data: FunctionData) -> List[str]:
@@ -138,7 +135,6 @@ class FunctionTranslator:
             for instr in entry_block.non_terminator_instructions:
                 if instr.opcode.upper() == 'PUSH' and instr.operands[0].type == 'register':
                     reg = instr.operands[0].register
-                    # Verify it’s popped later (simplified check)
                     for block in func_data.blocks:
                         if block.terminator_instruction and block.terminator_instruction.opcode.upper() == 'RET':
                             for instr in block.non_terminator_instructions:
@@ -176,7 +172,7 @@ class FunctionTranslator:
         entry_bb = block_map[asm_func.blocks[0].label]
         builder = ir.IRBuilder(entry_bb)
 
-        # Analyze and allocate locals
+
         local_vars = self.analyze_local_variables(asm_func)
         context = FunctionContext(
             func=func,
@@ -190,24 +186,24 @@ class FunctionTranslator:
         for offset, (size, ir_type) in local_vars.items():
             alloca = builder.alloca(ir_type, name=f"local_{abs(offset)}")
             if size >= 128:
-                alloca.align = 16  # For XMM registers
+                alloca.align = 16
             elif size >= 64:
                 alloca.align = 8
             else:
                 alloca.align = 4
             context.stack_vars[offset] = alloca
 
-        # Handle function prologue (e.g., saved registers)
+
         saved_regs = self.analyze_saved_registers(asm_func)
         for reg in saved_regs:
             reg_type = self.reg_manager.get_register_type(reg)
             context.saved_regs[reg] = builder.alloca(reg_type, name=f"saved_{reg.lower()}")
 
         arg_registers = ["RDI", "RSI", "RDX", "RCX", "R8", "R9"]
-        seen_params = set()  # Track processed parameters
+        seen_params = set()
         for i, (param, reg) in enumerate(zip(func.args, arg_registers[:len(func.args)])):
             if param in seen_params:
-                continue  # Skip if already processed
+                continue
             param_val = param
             reg_type = context.reg_manager.get_register_type(reg)
             if param_val.type != reg_type:
@@ -268,7 +264,7 @@ class FunctionTranslator:
 
     def _analyze_return_behavior(self, func_data: FunctionData) -> ir.Type:
         if self._function_sets_rax_before_ret(func_data):
-            # Check if the return value might be a pointer (e.g., from malloc or global address)
+
             for block in func_data.blocks:
                 if block.terminator_instruction and block.terminator_instruction.opcode.upper() == 'RET':
                     for instr in block.non_terminator_instructions:
@@ -281,9 +277,9 @@ class FunctionTranslator:
                                 (instr.opcode.upper() == 'CALL' and
                                 src.name in self.llvm_generator.known_externs and
                                 isinstance(self.llvm_generator.known_externs[src.name].return_type, ir.PointerType))):
-                                return ir.PointerType(ir.IntType(8))  # i8* for pointers
-            return ir.IntType(64)  # Default to i64 for other return values
-        return ir.VoidType()  # No explicit return value set
+                                return ir.PointerType(ir.IntType(8))
+            return ir.IntType(64)
+        return ir.VoidType()
 
 
     def create_llvm_function_prototype(self, func_name: str, func_data: FunctionData) -> ir.Function:
@@ -295,12 +291,12 @@ class FunctionTranslator:
         if existing_func and isinstance(existing_func, ir.Function):
             return existing_func
 
-        # Special cases
+
         if func_name == "main":
             param_types = [
-                ir.IntType(32),  # argc
-                ir.PointerType(ir.PointerType(ir.IntType(8))),  # argv
-                ir.PointerType(ir.PointerType(ir.IntType(8)))   # envp
+                ir.IntType(32),
+                ir.PointerType(ir.PointerType(ir.IntType(8))),
+                ir.PointerType(ir.PointerType(ir.IntType(8)))
             ]
             func_type = ir.FunctionType(ir.IntType(32), param_types)
         elif func_name == "_start":
@@ -415,16 +411,16 @@ class FunctionTranslator:
 
     def _function_sets_rax_before_ret(self, func_data: FunctionData) -> bool:
         """Check if the function sets RAX (or subregisters) before any RET instruction."""
-        return_regs = {'RAX', 'EAX', 'AX', 'AL'}  # Registers that could indicate a return value
+        return_regs = {'RAX', 'EAX', 'AX', 'AL'}
         for block in func_data.blocks:
             if block.terminator_instruction and block.terminator_instruction.opcode.upper() == 'RET':
-                # Check instructions in this block leading to RET
+
                 for instr in block.non_terminator_instructions:
                     if (instr.opcode.upper() in {'MOV', 'LEA', 'ADD', 'SUB', 'XOR', 'CALL'} and
                         instr.operands and instr.operands[0].type == 'register' and
                         instr.operands[0].register in return_regs):
                         return True
-                # If CALL is the last instruction before RET, check the called function
+
                 if (block.non_terminator_instructions and
                     block.non_terminator_instructions[-1].opcode.upper() == 'CALL'):
                     target = block.non_terminator_instructions[-1].operands[0]
@@ -440,12 +436,10 @@ class FunctionTranslator:
 
         if dest.type == "register":
             context.reg_manager.set_register_ssa(dest.register, src_val, context.builder)
-        #POTENTIALLY PROBLEMATIC BLOCK BEGINS
         elif dest.type == "memory":
             ptr = self.calculate_memory_address(dest, context)
             typed_ptr = context.builder.bitcast(ptr, ir.PointerType(dest_type))
             context.builder.store(src_val, typed_ptr)
-        #POTENTIALLY PROBLEMATIC BLOCK ENDS
 
 
     def translate_XOR(self, instr: InstructionData, context: FunctionContext):
@@ -460,7 +454,7 @@ class FunctionTranslator:
             ptr = self.calculate_memory_address(dest, context)
             typed_ptr = context.builder.bitcast(ptr, ir.PointerType(dest_type))
             context.builder.store(result, typed_ptr)
-        # Set last_condition for potential flag usage
+
         context.last_condition = ("ARITH", result, None)
 
 
@@ -468,7 +462,6 @@ class FunctionTranslator:
         pass
 
     def translate_LEAVE(self, instr: InstructionData, context: 'FunctionContext'):
-
         rbp_current = context.reg_manager.get_register_ssa("RBP", context.builder)
 
         context.reg_manager.set_register_ssa("RSP", rbp_current, context.builder)
@@ -487,7 +480,7 @@ class FunctionTranslator:
             raise NotImplementedError("SETNE only supports register operands")
         if context.last_condition is None:
             raise ValueError("SETNE requires a preceding flag-setting instruction")
-        # Compute ZF based on last_condition
+
         cond_type, value1, value2 = context.last_condition
         if cond_type == "CMP":
             zf = context.builder.icmp_signed('==', value1, value2, name="zf")
@@ -531,7 +524,7 @@ class FunctionTranslator:
             context.builder.store(result, typed_ptr)
         else:
             raise NotImplementedError(f"SHR destination type {dest.type} not supported")
-        # Set last_condition for potential flag usage
+
         context.last_condition = ("ARITH", result, None)
 
     def translate_SHL(self, instr: InstructionData, context: FunctionContext):
@@ -552,7 +545,7 @@ class FunctionTranslator:
             context.builder.store(result, typed_ptr)
         else:
             raise NotImplementedError(f"SHL destination type {dest.type} not supported")
-        # Set last_condition for potential flag usage
+
         context.last_condition = ("ARITH", result, None)
 
     def translate_ADD(self, instr: InstructionData, context: FunctionContext):
@@ -570,7 +563,7 @@ class FunctionTranslator:
             ptr = self.calculate_memory_address(dest, context)
             typed_ptr = context.builder.bitcast(ptr, ir.PointerType(dest_type))
             context.builder.store(result, typed_ptr)
-        # Set last_condition with the result
+
         context.last_condition = ("ARITH", result, None)
 
     def translate_SUB(self, instr: InstructionData, context: FunctionContext):
@@ -594,7 +587,7 @@ class FunctionTranslator:
             ptr = self.calculate_memory_address(dest, context)
             typed_ptr = context.builder.bitcast(ptr, ir.PointerType(dest_type))
             context.builder.store(result, typed_ptr)
-        # Set last_condition with the result
+
         context.last_condition = ("ARITH", result, None)
 
 
@@ -618,7 +611,7 @@ class FunctionTranslator:
                         reg_val = context.builder.trunc(reg_val, param_type)
                 args.append(reg_val)
             return args
-        # Fallback for unknown functions (keep as is)
+
         arg_regs = ["RDI", "RSI", "RDX", "RCX", "R8", "R9"]
         return [context.reg_manager.get_register_ssa(r, context.builder) for r in arg_regs]
 
@@ -633,14 +626,14 @@ class FunctionTranslator:
             raise ValueError("CMP instruction requires two operands")
         lhs = self.resolve_operand(instr.operands[0], context)
         rhs = self.resolve_operand(instr.operands[1], context)
-        # Adjust types if necessary
+
         if lhs.type != rhs.type:
             if isinstance(lhs.type, ir.IntType) and isinstance(rhs.type, ir.IntType):
                 if lhs.type.width < rhs.type.width:
                     lhs = context.builder.zext(lhs, rhs.type)
                 else:
                     rhs = context.builder.zext(rhs, lhs.type)
-        # Set last_condition instead of computing flags
+
         context.last_condition = ("CMP", lhs, rhs)
 
     def translate_MOVSX(self, instr: InstructionData, context: FunctionContext):
@@ -700,7 +693,7 @@ class FunctionTranslator:
             context.builder.store(result, typed_ptr)
         else:
             raise NotImplementedError(f"SAR destination type {dest.type} not supported")
-        # Set last_condition for potential flag usage
+
         context.last_condition = ("ARITH", result, None)
 
     def translate_TEST(self, instr: InstructionData, context: FunctionContext):
@@ -708,7 +701,7 @@ class FunctionTranslator:
             raise ValueError("TEST instruction requires two operands")
         lhs = self.resolve_operand(instr.operands[0], context)
         rhs = self.resolve_operand(instr.operands[1], context)
-        # Set last_condition instead of computing flags
+
         context.last_condition = ("TEST", lhs, rhs)
 
     def _get_function_type(self, name: str, module_data: ModuleData) -> ir.FunctionType:
@@ -722,19 +715,19 @@ class FunctionTranslator:
     def translate_LEA(self, instr: InstructionData, context: FunctionContext):
         dest, src = instr.operands
         if src.type == "memory":
-            # Handle standard memory operands (e.g., [RAX + 8])
+
             ptr = self.calculate_memory_address(src, context)
             ptr_int = context.builder.ptrtoint(ptr, ir.IntType(64))
             context.reg_manager.set_register_ssa(dest.register, ptr_int, context.builder)
         elif src.type == "name" and src.relocation == "..plt":
-            # Handle PLT references to external functions
+
             func_name = src.name
             func = self.module.get_global(func_name)
             if not func:
-                # If the function isn’t in the module, declare it using known externs or a default type
+
                 func_type = self.llvm_generator.known_externs.get(func_name, ir.FunctionType(ir.VoidType(), []))
                 func = ir.Function(self.module, func_type, name=func_name)
-            # Convert the function pointer to i64 for the register
+
             ptr_int = context.builder.ptrtoint(func, ir.IntType(64))
             context.reg_manager.set_register_ssa(dest.register, ptr_int, context.builder)
         else:
@@ -761,19 +754,19 @@ class FunctionTranslator:
     def translate_MOVAPS(self, instr: InstructionData, context: FunctionContext):
         dest, src = instr.operands
 
-        # Get source value (XMM register)
+
         if src.type == "register" and src.register.startswith("XMM"):
             src_val = context.reg_manager.get_register_ssa(src.register, context.builder)
         else:
             raise NotImplementedError("MOVAPS source must be XMM register in this context")
 
-        # Store to memory (stack relative to RBP)
+
         if dest.type == "memory":
             ptr = self.calculate_memory_address(dest, context)
-            # Cast to pointer of vector type with 16-byte alignment
+
             vec_ptr = context.builder.bitcast(ptr, ir.PointerType(ir.VectorType(ir.FloatType(), 4)))
             store_inst = context.builder.store(src_val, vec_ptr)
-            store_inst.align = 16  # MOVAPS requires 16-byte alignment
+            store_inst.align = 16
         else:
             raise NotImplementedError("MOVAPS destination type not supported")
 
@@ -812,7 +805,7 @@ class FunctionTranslator:
                     elif value.type.width > expected_type.width:
                         value = context.builder.trunc(value, expected_type)
                 else:
-                    # Handle unexpected type mismatches, default to ptrtoint for pointers
+
                     if isinstance(value.type, ir.PointerType):
                         value = context.builder.ptrtoint(value, expected_type or reg_type)
             return value
@@ -858,27 +851,35 @@ class FunctionTranslator:
             return context.builder.gep(global_var, [ir.Constant(ir.IntType(32), 0), ir.Constant(ir.IntType(32), 0)]) if global_var else ir.Constant(ir.IntType(64), 0)
 
 
+    def get_type_size(self, ty: ir.Type) -> int:
+        if isinstance(ty, ir.IntType):
+            return ty.width // 8
+        elif isinstance(ty, ir.PointerType):
+            return 8
+        else:
+            raise NotImplementedError(f"Size calculation for type {ty} not implemented")
+
     def calculate_memory_address(self, operand: OperandData, context: FunctionContext):
         if operand.type != "memory":
             raise ValueError(f"Expected memory operand, got {operand.type}: {operand}")
 
-        # Stack variable optimization for RBP or RSP base
+
         if operand.base in ["RBP", "RSP"] and operand.index is None:
             base_val = context.reg_manager.get_register_ssa(operand.base, context.builder)
             if operand.displacement in context.stack_vars:
                 alloca = context.stack_vars[operand.displacement]
-                return alloca  # Direct use of alloca
+                return alloca
             else:
                 offset = ir.Constant(ir.IntType(64), operand.displacement or 0)
                 access_type = self.get_operand_type(operand, context)
                 return context.builder.gep(base_val, [offset], inbounds=True)
 
-        # General memory access: [base + index * scale + displacement]
+
         effective_address = None
         if operand.base:
             base_val = context.reg_manager.get_register_ssa(operand.base, context.builder)
             if isinstance(base_val.type, ir.PointerType):
-                # Base is already a pointer, use GEP
+
                 indices = []
                 if operand.index:
                     index_val = context.reg_manager.get_register_ssa(operand.index, context.builder)
@@ -906,31 +907,27 @@ class FunctionTranslator:
             disp = ir.Constant(ir.IntType(64), operand.displacement)
             effective_address = context.builder.add(effective_address, disp)
 
-        #POTENTIALLY PROBLEMATIC BLOCK BEGINS
         if effective_address:
-            # Apply segment base if present
+
             segment_base = (context.reg_manager.get_register_ssa(operand.segment, context.builder)
                         if operand.segment in ["FS", "GS"] else
                         ir.Constant(ir.IntType(64), 0))
             total_address = context.builder.add(segment_base, effective_address)
             access_type = self.get_operand_type(operand, context)
             return context.builder.inttoptr(total_address, ir.PointerType(access_type))
-        #POTENTIALLY PROBLEMATIC BLOCK ENDS
 
-        # RIP-relative addressing
+
         if operand.is_rip_relative:
             if operand.name in self.module_data.label_to_section_offset:
                 section_name, label_offset = self.module_data.label_to_section_offset[operand.name]
                 if section_name in self.llvm_generator.section_globals:
                     section_global = self.llvm_generator.section_globals[section_name]
-                    # Determine the access type for the operand
                     access_type = self.get_operand_type(operand, context)
-                    # Cast the section_global to a pointer of the access type
+                    element_size = self.get_type_size(access_type)
                     base_ptr = context.builder.bitcast(section_global, ir.PointerType(access_type))
-                    # Calculate the total offset including displacement
-                    total_offset = label_offset + (operand.displacement or 0)
-                    offset_val = ir.Constant(ir.IntType(64), total_offset)
-                    # Compute the final pointer using gep
+                    byte_offset = label_offset + (operand.displacement or 0)
+                    index = byte_offset // element_size
+                    offset_val = ir.Constant(ir.IntType(64), index)
                     return context.builder.gep(base_ptr, [offset_val], inbounds=True)
             elif operand.name:
                 global_var = self.module.get_global(operand.name)
@@ -941,7 +938,7 @@ class FunctionTranslator:
                     return global_var
             raise ValueError(f"RIP-relative address for {operand.name} not resolvable")
 
-        # GOT (Global Offset Table) handling
+
         if operand.relocation == "..got" and operand.name:
             got_name = f".got.{operand.name}"
             got_var = self.module.get_global(got_name)

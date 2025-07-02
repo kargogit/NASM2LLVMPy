@@ -239,7 +239,7 @@ class LLVMGenerator:
                 else:
                     func_type = self.known_externs.get(
                         symbol,
-                        ir.FunctionType(ir.IntType(64), [ir.IntType(64)] * 6)  # Non-variadic, 6 args
+                        ir.FunctionType(ir.IntType(64), [ir.IntType(64)] * 6)
                     )
                     func = ir.Function(self.module, func_type, name=symbol)
                     func.linkage = 'external'

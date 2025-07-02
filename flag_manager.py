@@ -13,9 +13,8 @@ class FlagManager:
     def initialize_block(self, block: ir.Block, predecessors: List[ir.Block], builder: ir.IRBuilder):
         self.current_block = block
         self.current_flags = {}
-        # Only initialize flags if explicitly needed (e.g., for SETcc instructions)
         if not predecessors:
-            for flag in ['ZF']:  # Reduced to flags still in use
+            for flag in ['ZF']:
                 self.current_flags[flag] = ir.Constant(ir.IntType(1), 0)
 
     def compute_flag(self, flag_name: str, builder: ir.IRBuilder, reg_manager) -> ir.Value:

@@ -257,6 +257,7 @@ class Parser:
         for part in expression:
             if isinstance(part, dict):
                 if "additiveExpression" in part:
+                    multiply = False
                     addSubExpress = part["additiveExpression"]
                     if "multiplicativeExpression" in addSubExpress[0]:
                         addSubExpress = addSubExpress[0]["multiplicativeExpression"]
@@ -264,7 +265,10 @@ class Parser:
                     if "castExpression" in addSubExpress[0]:
                         firstOperand = addSubExpress[0]["castExpression"][0]
                         if "register" in firstOperand:
-                            base = firstOperand["register"][0][0]
+                            if multiply:
+                                index = firstOperand["register"][0][0]
+                            else:
+                                base = firstOperand["register"][0][0]
                         elif "name" in firstOperand:
                             name = firstOperand["name"][0][0]
                             name = name.replace("RELA", "L")

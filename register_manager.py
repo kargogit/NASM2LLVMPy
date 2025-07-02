@@ -103,7 +103,7 @@ class RegisterManager:
 
     def __init__(self):
         self.current_block: Optional[ir.Block] = None
-        self.predecessors: List[ir.Block] = []  # Store predecessor blocks
+        self.predecessors: List[ir.Block] = []
         self.current_registers: Dict[str, ir.Value] = {}
         self.exit_registers: Dict[ir.Block, Dict[str, ir.Value]] = {}
         self.defined_in_block: set = set()
@@ -115,15 +115,17 @@ class RegisterManager:
 
     def initialize_block(self, block: ir.Block, predecessors: List[ir.Block], builder: ir.IRBuilder):
         self.current_block = block
+        self.predecessors = predecessors
         self.current_registers = {}
         self.defined_in_block = set()
         if not predecessors:
-            # Initialize all registers to zero or appropriate constants
-            for reg in self.register_info:
-                if reg.startswith('XMM'):
-                    self.current_registers[reg] = ir.Constant(ir.VectorType(ir.FloatType(), 4), [0.0, 0.0, 0.0, 0.0])
-                else:
-                    self.current_registers[reg] = ir.Constant(self.get_register_type(reg), 0)
+
+            for reg, reg_info in self.register_info.items():
+                if not reg_info["parent"]:
+                    if reg.startswith('XMM'):
+                        self.current_registers[reg] = ir.Constant(ir.VectorType(ir.FloatType(), 4), [0.0, 0.0, 0.0, 0.0])
+                    else:
+                        self.current_registers[reg] = ir.Constant(self.get_register_type(reg), 0)
             func = block.parent
             arg_registers = ["RDI", "RSI", "RDX", "RCX", "R8", "R9"]
             for i, param in enumerate(func.args):
@@ -149,31 +151,76 @@ class RegisterManager:
         return ir.IntType(size)
 
 
+    def get_top_level_parent_and_offset(self, reg_name: str) -> tuple[str, int]:
+        """Find the top-level parent register and total bit offset for a given register."""
+        total_offset = 0
+        current_reg = reg_name
+        while True:
+            info = self.register_info.get(current_reg)
+            if not info or info['parent'] is None:
+                return current_reg, total_offset
+            total_offset += info['offset']
+            current_reg = info['parent']
+
+
     def get_register_ssa(self, reg_name: str, builder: ir.IRBuilder) -> ir.Value:
-        if reg_name in self.defined_in_block or not self.predecessors:
+        if reg_name in self.defined_in_block:
             return self.current_registers.get(reg_name, ir.Constant(self.get_register_type(reg_name), 0))
 
-        pred_values = []
-        unique_values = set()
-        for pred in self.predecessors:
-            pred_val = (self.exit_registers.get(pred, {}).get(reg_name) or
-                        ir.Constant(self.get_register_type(reg_name), 0))
-            pred_values.append(pred_val)
-            unique_values.add(str(pred_val))  # Use str() to compare IR values
+        top_reg, offset = self.get_top_level_parent_and_offset(reg_name)
+        size = self.register_info[reg_name]['size']
 
-        if len(unique_values) > 1:
-            # Multiple distinct values; create a PHI node
-            with builder.goto_entry_block():
+
+        if top_reg == reg_name and self.predecessors:
+            pred_values = []
+            unique_values = set()
+            for pred in self.predecessors:
+                pred_val = (self.exit_registers.get(pred, {}).get(reg_name) or
+                            ir.Constant(self.get_register_type(reg_name), 0))
+                pred_values.append(pred_val)
+                unique_values.add(str(pred_val))
+
+            if len(unique_values) > 1:
+
+                original_block = builder.block
+
+                builder.position_at_start(self.current_block)
+
                 phi = builder.phi(self.get_register_type(reg_name), name=f"{reg_name}_phi")
                 for pred, val in zip(self.predecessors, pred_values):
                     phi.add_incoming(val, pred)
-            self.current_registers[reg_name] = phi
-            return phi
+
+                builder.position_at_end(original_block)
+                self.current_registers[reg_name] = phi
+                return phi
+            else:
+
+                value = pred_values[0] if pred_values else ir.Constant(self.get_register_type(reg_name), 0)
+                self.current_registers[reg_name] = value
+                return value
+
+
+        if top_reg in self.current_registers:
+            top_val = self.current_registers[top_reg]
+        elif self.predecessors:
+
+            top_val = self.get_register_ssa(top_reg, builder)
         else:
-            # Single value across predecessors; no PHI needed
-            value = pred_values[0] if pred_values else ir.Constant(self.get_register_type(reg_name), 0)
-            self.current_registers[reg_name] = value
-            return value
+            top_val = ir.Constant(self.get_register_type(top_reg), 0)
+
+
+        if offset == 0 and size in [8, 16, 32, 64]:
+
+            return builder.trunc(top_val, ir.IntType(size), name=f"{reg_name}_trunc")
+        else:
+
+            if offset != 0:
+                shifted = builder.lshr(top_val, ir.Constant(top_val.type, offset), name=f"{reg_name}_shift")
+            else:
+                shifted = top_val
+            mask = (1 << size) - 1
+            masked = builder.and_(shifted, ir.Constant(shifted.type, mask), name=f"{reg_name}_mask")
+            return builder.trunc(masked, ir.IntType(size), name=f"{reg_name}_val")
 
 
     def set_register_ssa(self, reg_name: str, value: ir.Value, builder: ir.IRBuilder):
@@ -183,16 +230,16 @@ class RegisterManager:
         elif value.type != reg_type:
             if isinstance(value.type, ir.IntType):
                 if value.type.width < reg_type.width:
-                    #builder.add(ir.Constant(ir.IntType(1), 0), ir.Constant(ir.IntType(1), 0), name="nop14")
+
                     value = builder.zext(value, reg_type)
                 elif value.type.width > reg_type.width:
                     value = builder.trunc(value, reg_type)
             else:
                 raise TypeError(f"Expected integer type for {reg_name}, got {value.type}")
         self.current_registers[reg_name] = value
-        self.defined_in_block.add(reg_name)  # Mark as defined in this block
+        self.defined_in_block.add(reg_name)
 
-        # Update parent registers (unchanged)
+
         current_reg = reg_name
         current_value = value
         while True:
@@ -205,7 +252,7 @@ class RegisterManager:
             parent_value = self.current_registers.get(parent, ir.Constant(parent_type, 0))
             mask = (1 << size) - 1
             masked_parent = builder.and_(parent_value, ir.Constant(parent_type, ~(mask << offset)))
-            #builder.add(ir.Constant(ir.IntType(1), 0), ir.Constant(ir.IntType(1), 0), name="nop15")
+
             shifted_value = builder.shl(builder.zext(current_value, parent_type), ir.Constant(parent_type, offset))
             new_parent_value = builder.or_(masked_parent, shifted_value)
             self.current_registers[parent] = new_parent_value

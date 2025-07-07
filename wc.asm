@@ -14,6 +14,7 @@ extern putchar
 extern puts
 extern stderr
 extern stdin
+extern strcmp
 
 
 global _IO_stdin_used
@@ -30,6 +31,7 @@ global main
 global print_bytes
 global print_chars
 global print_counts
+global print_help
 global print_lines
 global print_max_line_length
 global print_words
@@ -73,7 +75,7 @@ L1000_2:
 ; ----------------
 ; Function: _start
 ; ----------------
-; Entry 1160; block 0; address 1160
+; Entry 1180; block 0; address 1180
 _start:
   XOR EBP, EBP
   MOV R9, RDX
@@ -84,11 +86,11 @@ _start:
   PUSH RSP
   XOR R8D, R8D
   XOR ECX, ECX
-  LEA RDI, [main]    ; 0x14dc --> main
+  LEA RDI, [main]    ; 0x15d1 --> main
   CALL __libc_start_main wrt ..plt
 
-; Entry 1160; block 1; address 1185
-L1160_1:
+; Entry 1180; block 1; address 11a5
+L1180_1:
   HLT
 
 
@@ -97,29 +99,29 @@ L1160_1:
 ; ------------------------------
 ; Function: deregister_tm_clones
 ; ------------------------------
-; Entry 1190; block 0; address 1190
+; Entry 11b0; block 0; address 11b0
 deregister_tm_clones:
   LEA RDI, [__TMC_END__]    ; 0x4010 --> __TMC_END__
   LEA RAX, [__TMC_END__]    ; 0x4010 --> __TMC_END__
   CMP RAX, RDI
-  JZ L1190_2    ; 0x11b8 --> L1190_2
+  JZ L11b0_2    ; 0x11d8 --> L11b0_2
 
-; Entry 1190; block 1; address 11a3
-L1190_1:
+; Entry 11b0; block 1; address 11c3
+L11b0_1:
   MOV qword [Ltemp_storage_foxdec], RBX ; inserted
   LEA RBX, [_ITM_deregisterTMCloneTable wrt ..plt]
   MOV RAX, RBX
   MOV RBX, qword [Ltemp_storage_foxdec] ; inserted
   TEST RAX, RAX
-  JZ L1190_2    ; 0x11b8 --> L1190_2
+  JZ L11b0_2    ; 0x11d8 --> L11b0_2
 
-; Entry 1190; block 3; address 11af
-L1190_3:
+; Entry 11b0; block 3; address 11cf
+L11b0_3:
   ; Resolved indirection: RAX --> _ITM_deregisterTMCloneTable
   JMP _ITM_deregisterTMCloneTable wrt ..plt
 
-; Entry 1190; block 2; address 11b8
-L1190_2:
+; Entry 11b0; block 2; address 11d8
+L11b0_2:
   RET
 
 
@@ -128,38 +130,38 @@ L1190_2:
 ; -------------------------------
 ; Function: __do_global_dtors_aux
 ; -------------------------------
-; Entry 1200; block 0; address 1200
+; Entry 1220; block 0; address 1220
 __do_global_dtors_aux:
   CMP byte [L_.bss_0x4048], 0x0    ; 0x4048 --> L_.bss_0x4048
-  JNZ L1200_2    ; 0x1238 --> L1200_2
+  JNZ L1220_2    ; 0x1258 --> L1220_2
 
-; Entry 1200; block 1; address 120d
-L1200_1:
+; Entry 1220; block 1; address 122d
+L1220_1:
   PUSH RBP
   MOV qword [Ltemp_storage_foxdec], RAX ; inserted
   LEA RAX, [__cxa_finalize wrt ..plt]
   CMP RAX, 0x0
   MOV RAX, qword [Ltemp_storage_foxdec] ; inserted
   MOV RBP, RSP
-  JZ L1200_4    ; 0x1227 --> L1200_4
+  JZ L1220_4    ; 0x1247 --> L1220_4
 
-; Entry 1200; block 3; address 121b
-L1200_3:
+; Entry 1220; block 3; address 123b
+L1220_3:
   MOV RDI, qword [__dso_handle]    ; 0x4008 --> __dso_handle
   CALL __cxa_finalize wrt ..plt
 
-; Entry 1200; block 4; address 1227
-L1200_4:
-  CALL deregister_tm_clones    ; 0x1190 --> deregister_tm_clones
+; Entry 1220; block 4; address 1247
+L1220_4:
+  CALL deregister_tm_clones    ; 0x11b0 --> deregister_tm_clones
 
-; Entry 1200; block 5; address 122c
-L1200_5:
+; Entry 1220; block 5; address 124c
+L1220_5:
   MOV byte [L_.bss_0x4048], 0x1    ; 0x4048 --> L_.bss_0x4048
   POP RBP
   RET
 
-; Entry 1200; block 2; address 1238
-L1200_2:
+; Entry 1220; block 2; address 1258
+L1220_2:
   RET
 
 
@@ -168,25 +170,25 @@ L1200_2:
 ; ---------------------
 ; Function: frame_dummy
 ; ---------------------
-; Entry 1240; block 1; address 11e4
-L1240_1:
+; Entry 1260; block 1; address 1204
+L1260_1:
   MOV qword [Ltemp_storage_foxdec], RBX ; inserted
   LEA RBX, [_ITM_registerTMCloneTable wrt ..plt]
   MOV RAX, RBX
   MOV RBX, qword [Ltemp_storage_foxdec] ; inserted
   TEST RAX, RAX
-  JZ L1240_2    ; 0x11f8 --> L1240_2
+  JZ L1260_2    ; 0x1218 --> L1260_2
 
-; Entry 1240; block 3; address 11f0
-L1240_3:
+; Entry 1260; block 3; address 1210
+L1260_3:
   ; Resolved indirection: RAX --> _ITM_registerTMCloneTable
   JMP _ITM_registerTMCloneTable wrt ..plt
 
-; Entry 1240; block 2; address 11f8
-L1240_2:
+; Entry 1260; block 2; address 1218
+L1260_2:
   RET
 
-; Entry 1240; block 0; address 1240
+; Entry 1260; block 0; address 1260
 frame_dummy:
   LEA RDI, [__TMC_END__]    ; 0x4010 --> __TMC_END__
   LEA RSI, [__TMC_END__]    ; 0x4010 --> __TMC_END__
@@ -196,8 +198,8 @@ frame_dummy:
   SAR RAX, 0x3
   ADD RSI, RAX
   SAR RSI, 0x1
-  JZ L1240_2    ; 0x11f8 --> L1240_2
-  JMP L1240_1 ; jump is inserted
+  JZ L1260_2    ; 0x1218 --> L1260_2
+  JMP L1260_1 ; jump is inserted
 
 
 
@@ -205,7 +207,7 @@ frame_dummy:
 ; ----------------------
 ; Function: print_counts
 ; ----------------------
-; Entry 1249; block 0; address 1249
+; Entry 1269; block 0; address 1269
 print_counts:
   PUSH RBP
   MOV RBP, RSP
@@ -218,99 +220,99 @@ print_counts:
   MOV qword [RBP - 0x30], R9
   MOV EAX, dword [L_.bss_0x4050]    ; 0x4050 --> L_.bss_0x4050
   TEST EAX, EAX
-  JZ L1249_2    ; 0x1292 --> L1249_2
+  JZ L1269_2    ; 0x12b2 --> L1269_2
 
-; Entry 1249; block 1; address 1277
-L1249_1:
+; Entry 1269; block 1; address 1297
+L1269_1:
   MOV RAX, qword [RBP - 0x8]
   MOV RSI, RAX
-  LEA RAX, [L_.rodata_0x2004]    ; 0x2004 --> L_.rodata_0x2004
+  LEA RAX, [L_.rodata_0x2008]    ; 0x2008 --> L_.rodata_0x2008
   MOV RDI, RAX
   MOV EAX, 0x0
   CALL printf wrt ..plt
 
-; Entry 1249; block 2; address 1292
-L1249_2:
+; Entry 1269; block 2; address 12b2
+L1269_2:
   MOV EAX, dword [L_.bss_0x4054]    ; 0x4054 --> L_.bss_0x4054
   TEST EAX, EAX
-  JZ L1249_4    ; 0x12b7 --> L1249_4
+  JZ L1269_4    ; 0x12d7 --> L1269_4
 
-; Entry 1249; block 3; address 129c
-L1249_3:
+; Entry 1269; block 3; address 12bc
+L1269_3:
   MOV RAX, qword [RBP - 0x10]
   MOV RSI, RAX
-  LEA RAX, [L_.rodata_0x2004]    ; 0x2004 --> L_.rodata_0x2004
+  LEA RAX, [L_.rodata_0x2008]    ; 0x2008 --> L_.rodata_0x2008
   MOV RDI, RAX
   MOV EAX, 0x0
   CALL printf wrt ..plt
 
-; Entry 1249; block 4; address 12b7
-L1249_4:
+; Entry 1269; block 4; address 12d7
+L1269_4:
   MOV EAX, dword [L_.bss_0x4058]    ; 0x4058 --> L_.bss_0x4058
   TEST EAX, EAX
-  JZ L1249_6    ; 0x12dc --> L1249_6
+  JZ L1269_6    ; 0x12fc --> L1269_6
 
-; Entry 1249; block 5; address 12c1
-L1249_5:
+; Entry 1269; block 5; address 12e1
+L1269_5:
   MOV RAX, qword [RBP - 0x18]
   MOV RSI, RAX
-  LEA RAX, [L_.rodata_0x2004]    ; 0x2004 --> L_.rodata_0x2004
+  LEA RAX, [L_.rodata_0x2008]    ; 0x2008 --> L_.rodata_0x2008
   MOV RDI, RAX
   MOV EAX, 0x0
   CALL printf wrt ..plt
 
-; Entry 1249; block 6; address 12dc
-L1249_6:
+; Entry 1269; block 6; address 12fc
+L1269_6:
   MOV EAX, dword [L_.bss_0x405c]    ; 0x405c --> L_.bss_0x405c
   TEST EAX, EAX
-  JZ L1249_8    ; 0x1301 --> L1249_8
+  JZ L1269_8    ; 0x1321 --> L1269_8
 
-; Entry 1249; block 7; address 12e6
-L1249_7:
+; Entry 1269; block 7; address 1306
+L1269_7:
   MOV RAX, qword [RBP - 0x20]
   MOV RSI, RAX
-  LEA RAX, [L_.rodata_0x2004]    ; 0x2004 --> L_.rodata_0x2004
+  LEA RAX, [L_.rodata_0x2008]    ; 0x2008 --> L_.rodata_0x2008
   MOV RDI, RAX
   MOV EAX, 0x0
   CALL printf wrt ..plt
 
-; Entry 1249; block 8; address 1301
-L1249_8:
+; Entry 1269; block 8; address 1321
+L1269_8:
   MOV EAX, dword [L_.bss_0x4060]    ; 0x4060 --> L_.bss_0x4060
   TEST EAX, EAX
-  JZ L1249_10    ; 0x1326 --> L1249_10
+  JZ L1269_10    ; 0x1346 --> L1269_10
 
-; Entry 1249; block 9; address 130b
-L1249_9:
+; Entry 1269; block 9; address 132b
+L1269_9:
   MOV RAX, qword [RBP - 0x28]
   MOV RSI, RAX
-  LEA RAX, [L_.rodata_0x2004]    ; 0x2004 --> L_.rodata_0x2004
+  LEA RAX, [L_.rodata_0x2008]    ; 0x2008 --> L_.rodata_0x2008
   MOV RDI, RAX
   MOV EAX, 0x0
   CALL printf wrt ..plt
 
-; Entry 1249; block 10; address 1326
-L1249_10:
+; Entry 1269; block 10; address 1346
+L1269_10:
   CMP qword [RBP - 0x30], 0x0
-  JZ L1249_12    ; 0x133b --> L1249_12
+  JZ L1269_12    ; 0x135b --> L1269_12
 
-; Entry 1249; block 11; address 132d
-L1249_11:
+; Entry 1269; block 11; address 134d
+L1269_11:
   MOV RAX, qword [RBP - 0x30]
   MOV RDI, RAX
   CALL puts wrt ..plt
 
-; Entry 1249; block 13; address 1339
-L1249_13:
-  JMP L1249_14    ; 0x1345 --> L1249_14
+; Entry 1269; block 13; address 1359
+L1269_13:
+  JMP L1269_14    ; 0x1365 --> L1269_14
 
-; Entry 1249; block 12; address 133b
-L1249_12:
+; Entry 1269; block 12; address 135b
+L1269_12:
   MOV EDI, 0xa
   CALL putchar wrt ..plt
 
-; Entry 1249; block 14; address 1345
-L1249_14:
+; Entry 1269; block 14; address 1365
+L1269_14:
   LEAVE
   RET
 
@@ -320,7 +322,7 @@ L1249_14:
 ; ----------------------
 ; Function: process_file
 ; ----------------------
-; Entry 1348; block 0; address 1348
+; Entry 1368; block 0; address 1368
 process_file:
   PUSH RBP
   MOV RBP, RSP
@@ -334,40 +336,40 @@ process_file:
   MOV qword [RBP - 0x10], 0x0
   MOV qword [RBP - 0x8], 0x0
   MOV dword [RBP - 0x38], 0x0
-  JMP L1348_6    ; 0x1410 --> L1348_6
+  JMP L1368_6    ; 0x1430 --> L1368_6
 
-; Entry 1348; block 11; address 1395
-L1348_11:
+; Entry 1368; block 11; address 13b5
+L1368_11:
   ADD qword [RBP - 0x18], 0x1
   ADD qword [RBP - 0x20], 0x1
   CMP dword [RBP - 0x34], 0xa
-  JNZ L1348_3    ; 0x13cd --> L1348_3
+  JNZ L1368_3    ; 0x13ed --> L1368_3
 
-; Entry 1348; block 2; address 13a5
-L1348_2:
+; Entry 1368; block 2; address 13c5
+L1368_2:
   ADD qword [RBP - 0x30], 0x1
   MOV RAX, qword [RBP - 0x8]
   CMP qword [RBP - 0x10], RAX
-  JAE L1348_5    ; 0x13bc --> L1348_5
+  JAE L1368_5    ; 0x13dc --> L1368_5
 
-; Entry 1348; block 4; address 13b4
-L1348_4:
+; Entry 1368; block 4; address 13d4
+L1368_4:
   MOV RAX, qword [RBP - 0x8]
   MOV qword [RBP - 0x10], RAX
 
-; Entry 1348; block 5; address 13bc
-L1348_5:
+; Entry 1368; block 5; address 13dc
+L1368_5:
   MOV qword [RBP - 0x8], 0x0
   MOV dword [RBP - 0x38], 0x0
-  JMP L1348_6    ; 0x1410 --> L1348_6
+  JMP L1368_6    ; 0x1430 --> L1368_6
 
-; Entry 1348; block 3; address 13cd
-L1348_3:
+; Entry 1368; block 3; address 13ed
+L1368_3:
   ADD qword [RBP - 0x8], 0x1
   CALL __ctype_b_loc wrt ..plt
 
-; Entry 1348; block 7; address 13d7
-L1348_7:
+; Entry 1368; block 7; address 13f7
+L1368_7:
   MOV RAX, qword [RAX]
   MOV EDX, dword [RBP - 0x34]
   MOVSXD RDX, EDX
@@ -377,54 +379,54 @@ L1348_7:
   MOVZX EAX, AX
   AND EAX, 0x2000
   TEST EAX, EAX
-  JZ L1348_9    ; 0x13fe --> L1348_9
+  JZ L1368_9    ; 0x141e --> L1368_9
 
-; Entry 1348; block 8; address 13f5
-L1348_8:
+; Entry 1368; block 8; address 1415
+L1368_8:
   MOV dword [RBP - 0x38], 0x0
-  JMP L1348_6    ; 0x1410 --> L1348_6
+  JMP L1368_6    ; 0x1430 --> L1368_6
 
-; Entry 1348; block 9; address 13fe
-L1348_9:
+; Entry 1368; block 9; address 141e
+L1368_9:
   CMP dword [RBP - 0x38], 0x0
-  JNZ L1348_6    ; 0x1410 --> L1348_6
+  JNZ L1368_6    ; 0x1430 --> L1368_6
 
-; Entry 1348; block 10; address 1404
-L1348_10:
+; Entry 1368; block 10; address 1424
+L1368_10:
   ADD qword [RBP - 0x28], 0x1
   MOV dword [RBP - 0x38], 0x1
 
-; Entry 1348; block 6; address 1410
-L1348_6:
+; Entry 1368; block 6; address 1430
+L1368_6:
   MOV RAX, qword [RBP - 0x48]
   MOV RDI, RAX
   CALL fgetc wrt ..plt
 
-; Entry 1348; block 1; address 141c
-L1348_1:
+; Entry 1368; block 1; address 143c
+L1368_1:
   MOV dword [RBP - 0x34], EAX
   CMP dword [RBP - 0x34], 0xffffffff
-  JNZ L1348_11    ; 0x1395 --> L1348_11
+  JNZ L1368_11    ; 0x13b5 --> L1368_11
 
-; Entry 1348; block 12; address 1429
-L1348_12:
+; Entry 1368; block 12; address 1449
+L1368_12:
   CMP qword [RBP - 0x8], 0x0
-  JZ L1348_14    ; 0x1447 --> L1348_14
+  JZ L1368_14    ; 0x1467 --> L1368_14
 
-; Entry 1348; block 13; address 1430
-L1348_13:
+; Entry 1368; block 13; address 1450
+L1368_13:
   ADD qword [RBP - 0x30], 0x1
   MOV RAX, qword [RBP - 0x8]
   CMP qword [RBP - 0x10], RAX
-  JAE L1348_14    ; 0x1447 --> L1348_14
+  JAE L1368_14    ; 0x1467 --> L1368_14
 
-; Entry 1348; block 15; address 143f
-L1348_15:
+; Entry 1368; block 15; address 145f
+L1368_15:
   MOV RAX, qword [RBP - 0x8]
   MOV qword [RBP - 0x10], RAX
 
-; Entry 1348; block 14; address 1447
-L1348_14:
+; Entry 1368; block 14; address 1467
+L1368_14:
   MOV RDX, qword [L_.bss_0x4068]    ; 0x4068 --> L_.bss_0x4068
   MOV RAX, qword [RBP - 0x30]
   ADD RAX, RDX
@@ -443,15 +445,15 @@ L1348_14:
   MOV qword [L_.bss_0x4080], RAX    ; 0x4080 --> L_.bss_0x4080
   MOV RAX, qword [L_.bss_0x4088]    ; 0x4088 --> L_.bss_0x4088
   CMP RAX, qword [RBP - 0x10]
-  JAE L1348_17    ; 0x14b3 --> L1348_17
+  JAE L1368_17    ; 0x14d3 --> L1368_17
 
-; Entry 1348; block 16; address 14a8
-L1348_16:
+; Entry 1368; block 16; address 14c8
+L1368_16:
   MOV RAX, qword [RBP - 0x10]
   MOV qword [L_.bss_0x4088], RAX    ; 0x4088 --> L_.bss_0x4088
 
-; Entry 1348; block 17; address 14b3
-L1348_17:
+; Entry 1368; block 17; address 14d3
+L1368_17:
   MOV R8, qword [RBP - 0x50]
   MOV RDI, qword [RBP - 0x10]
   MOV RCX, qword [RBP - 0x18]
@@ -461,12 +463,105 @@ L1348_17:
   MOV R9, R8
   MOV R8, RDI
   MOV RDI, RAX
-  CALL print_counts    ; 0x1249 --> print_counts
+  CALL print_counts    ; 0x1269 --> print_counts
 
-; Entry 1348; block 18; address 14d9
-L1348_18:
+; Entry 1368; block 18; address 14f9
+L1368_18:
   LEAVE
   RET
+
+
+
+
+; --------------------
+; Function: print_help
+; --------------------
+; Entry 14fc; block 0; address 14fc
+print_help:
+  PUSH RBP
+  MOV RBP, RSP
+  LEA RAX, [L_.rodata_0x2010]    ; 0x2010 --> L_.rodata_0x2010
+  MOV RDI, RAX
+  CALL puts wrt ..plt
+
+; Entry 14fc; block 1; address 1513
+L14fc_1:
+  LEA RAX, [L_.rodata_0x2030]    ; 0x2030 --> L_.rodata_0x2030
+  MOV RDI, RAX
+  CALL puts wrt ..plt
+
+; Entry 14fc; block 2; address 1522
+L14fc_2:
+  LEA RAX, [L_.rodata_0x2078]    ; 0x2078 --> L_.rodata_0x2078
+  MOV RDI, RAX
+  CALL puts wrt ..plt
+
+; Entry 14fc; block 3; address 1531
+L14fc_3:
+  LEA RAX, [L_.rodata_0x20c8]    ; 0x20c8 --> L_.rodata_0x20c8
+  MOV RDI, RAX
+  CALL puts wrt ..plt
+
+; Entry 14fc; block 4; address 1540
+L14fc_4:
+  LEA RAX, [L_.rodata_0x2110]    ; 0x2110 --> L_.rodata_0x2110
+  MOV RDI, RAX
+  CALL puts wrt ..plt
+
+; Entry 14fc; block 5; address 154f
+L14fc_5:
+  LEA RAX, [L_.rodata_0x2148]    ; 0x2148 --> L_.rodata_0x2148
+  MOV RDI, RAX
+  CALL puts wrt ..plt
+
+; Entry 14fc; block 6; address 155e
+L14fc_6:
+  LEA RAX, [L_.rodata_0x2198]    ; 0x2198 --> L_.rodata_0x2198
+  MOV RDI, RAX
+  CALL puts wrt ..plt
+
+; Entry 14fc; block 7; address 156d
+L14fc_7:
+  LEA RAX, [L_.rodata_0x21e8]    ; 0x21e8 --> L_.rodata_0x21e8
+  MOV RDI, RAX
+  CALL puts wrt ..plt
+
+; Entry 14fc; block 8; address 157c
+L14fc_8:
+  LEA RAX, [L_.rodata_0x2210]    ; 0x2210 --> L_.rodata_0x2210
+  MOV RDI, RAX
+  CALL puts wrt ..plt
+
+; Entry 14fc; block 9; address 158b
+L14fc_9:
+  LEA RAX, [L_.rodata_0x2240]    ; 0x2240 --> L_.rodata_0x2240
+  MOV RDI, RAX
+  CALL puts wrt ..plt
+
+; Entry 14fc; block 10; address 159a
+L14fc_10:
+  LEA RAX, [L_.rodata_0x2270]    ; 0x2270 --> L_.rodata_0x2270
+  MOV RDI, RAX
+  CALL puts wrt ..plt
+
+; Entry 14fc; block 11; address 15a9
+L14fc_11:
+  LEA RAX, [L_.rodata_0x22a0]    ; 0x22a0 --> L_.rodata_0x22a0
+  MOV RDI, RAX
+  CALL puts wrt ..plt
+
+; Entry 14fc; block 12; address 15b8
+L14fc_12:
+  LEA RAX, [L_.rodata_0x22c8]    ; 0x22c8 --> L_.rodata_0x22c8
+  MOV RDI, RAX
+  CALL puts wrt ..plt
+
+; Entry 14fc; block 13; address 15c7
+L14fc_13:
+  MOV EDI, 0x0
+  NOP
+FOXDEC_TERMINATING_L14fc_13:
+  CALL exit wrt ..plt
 
 
 
@@ -474,7 +569,7 @@ L1348_18:
 ; --------------
 ; Function: main
 ; --------------
-; Entry 14dc; block 0; address 14dc
+; Entry 15d1; block 0; address 15d1
 main:
   PUSH RBP
   MOV RBP, RSP
@@ -482,27 +577,41 @@ main:
   MOV dword [RBP - 0x24], EDI
   MOV qword [RBP - 0x30], RSI
   MOV dword [RBP - 0x18], 0x1
-  JMP L14dc_21    ; 0x1631 --> L14dc_21
+  JMP L15d1_24    ; 0x173b --> L15d1_24
 
-; Entry 14dc; block 22; address 14fb
-L14dc_22:
+; Entry 15d1; block 25; address 15f0
+L15d1_25:
   MOV EAX, dword [RBP - 0x18]
   CDQE
   LEA RDX, [RAX * 8]
   MOV RAX, qword [RBP - 0x30]
   ADD RAX, RDX
   MOV RAX, qword [RAX]
-  MOVZX EAX, byte [RAX]
-  CMP AL, 0x2d
-  JNZ L14dc_2    ; 0x163f --> L14dc_2
+  LEA RDX, [L_.rodata_0x22f3]    ; 0x22f3 --> L_.rodata_0x22f3
+  MOV RSI, RDX
+  MOV RDI, RAX
+  CALL strcmp wrt ..plt
 
-; Entry 14dc; block 1; address 151d
-L14dc_1:
+; Entry 15d1; block 3; address 1619
+L15d1_3:
+  TEST EAX, EAX
+  JNZ L15d1_5    ; 0x1627 --> L15d1_5
+
+; Entry 15d1; block 4; address 161d
+L15d1_4:
+  NOP
+FOXDEC_TERMINATING_L15d1_4:
+  CALL print_help    ; 0x14fc --> print_help
+L15d1_4_HLT:
+  HLT ; should never be reached    ; 0x1622 --> L15d1_4_HLT
+
+; Entry 15d1; block 5; address 1627
+L15d1_5:
   MOV dword [RBP - 0x14], 0x1
-  JMP L14dc_18    ; 0x1603 --> L14dc_18
+  JMP L15d1_21    ; 0x170d --> L15d1_21
 
-; Entry 14dc; block 19; address 1529
-L14dc_19:
+; Entry 15d1; block 22; address 1633
+L15d1_22:
   MOV EAX, dword [RBP - 0x18]
   CDQE
   LEA RDX, [RAX * 8]
@@ -515,70 +624,70 @@ L14dc_19:
   MOVZX EAX, byte [RAX]
   MOVSX EAX, AL
   CMP EAX, 0x77
-  JZ L14dc_4    ; 0x159a --> L14dc_4
+  JZ L15d1_7    ; 0x16a4 --> L15d1_7
 
-; Entry 14dc; block 3; address 1553
-L14dc_3:
+; Entry 15d1; block 6; address 165d
+L15d1_6:
   CMP EAX, 0x77
-  JG L14dc_6    ; 0x15b2 --> L14dc_6
+  JG L15d1_9    ; 0x16bc --> L15d1_9
 
-; Entry 14dc; block 5; address 1558
-L14dc_5:
+; Entry 15d1; block 8; address 1662
+L15d1_8:
   CMP EAX, 0x6d
-  JZ L14dc_8    ; 0x1582 --> L14dc_8
+  JZ L15d1_11    ; 0x168c --> L15d1_11
 
-; Entry 14dc; block 7; address 155d
-L14dc_7:
+; Entry 15d1; block 10; address 1667
+L15d1_10:
   CMP EAX, 0x6d
-  JG L14dc_6    ; 0x15b2 --> L14dc_6
+  JG L15d1_9    ; 0x16bc --> L15d1_9
 
-; Entry 14dc; block 9; address 1562
-L14dc_9:
+; Entry 15d1; block 12; address 166c
+L15d1_12:
   CMP EAX, 0x6c
-  JZ L14dc_11    ; 0x158e --> L14dc_11
+  JZ L15d1_14    ; 0x1698 --> L15d1_14
 
-; Entry 14dc; block 10; address 1567
-L14dc_10:
+; Entry 15d1; block 13; address 1671
+L15d1_13:
   CMP EAX, 0x6c
-  JG L14dc_6    ; 0x15b2 --> L14dc_6
+  JG L15d1_9    ; 0x16bc --> L15d1_9
 
-; Entry 14dc; block 12; address 156c
-L14dc_12:
+; Entry 15d1; block 15; address 1676
+L15d1_15:
   CMP EAX, 0x4c
-  JZ L14dc_14    ; 0x15a6 --> L14dc_14
+  JZ L15d1_17    ; 0x16b0 --> L15d1_17
 
-; Entry 14dc; block 13; address 1571
-L14dc_13:
+; Entry 15d1; block 16; address 167b
+L15d1_16:
   CMP EAX, 0x63
-  JNZ L14dc_6    ; 0x15b2 --> L14dc_6
+  JNZ L15d1_9    ; 0x16bc --> L15d1_9
 
-; Entry 14dc; block 15; address 1576
-L14dc_15:
+; Entry 15d1; block 18; address 1680
+L15d1_18:
   MOV dword [L_.bss_0x405c], 0x1    ; 0x405c --> L_.bss_0x405c
-  JMP L14dc_16    ; 0x15ff --> L14dc_16
+  JMP L15d1_19    ; 0x1709 --> L15d1_19
 
-; Entry 14dc; block 8; address 1582
-L14dc_8:
+; Entry 15d1; block 11; address 168c
+L15d1_11:
   MOV dword [L_.bss_0x4058], 0x1    ; 0x4058 --> L_.bss_0x4058
-  JMP L14dc_16    ; 0x15ff --> L14dc_16
+  JMP L15d1_19    ; 0x1709 --> L15d1_19
 
-; Entry 14dc; block 11; address 158e
-L14dc_11:
+; Entry 15d1; block 14; address 1698
+L15d1_14:
   MOV dword [L_.bss_0x4050], 0x1    ; 0x4050 --> L_.bss_0x4050
-  JMP L14dc_16    ; 0x15ff --> L14dc_16
+  JMP L15d1_19    ; 0x1709 --> L15d1_19
 
-; Entry 14dc; block 4; address 159a
-L14dc_4:
+; Entry 15d1; block 7; address 16a4
+L15d1_7:
   MOV dword [L_.bss_0x4054], 0x1    ; 0x4054 --> L_.bss_0x4054
-  JMP L14dc_16    ; 0x15ff --> L14dc_16
+  JMP L15d1_19    ; 0x1709 --> L15d1_19
 
-; Entry 14dc; block 14; address 15a6
-L14dc_14:
+; Entry 15d1; block 17; address 16b0
+L15d1_17:
   MOV dword [L_.bss_0x4060], 0x1    ; 0x4060 --> L_.bss_0x4060
-  JMP L14dc_16    ; 0x15ff --> L14dc_16
+  JMP L15d1_19    ; 0x1709 --> L15d1_19
 
-; Entry 14dc; block 6; address 15b2
-L14dc_6:
+; Entry 15d1; block 9; address 16bc
+L15d1_9:
   MOV EAX, dword [RBP - 0x18]
   CDQE
   LEA RDX, [RAX * 8]
@@ -591,25 +700,25 @@ L14dc_6:
   MOVZX EAX, byte [RAX]
   MOVSX EDX, AL
   MOV RAX, qword [stderr]    ; 0x4040 --> stderr
-  LEA RCX, [L_.rodata_0x200a]    ; 0x200a --> L_.rodata_0x200a
+  LEA RCX, [L_.rodata_0x22fa]    ; 0x22fa --> L_.rodata_0x22fa
   MOV RSI, RCX
   MOV RDI, RAX
   MOV EAX, 0x0
   CALL fprintf wrt ..plt
 
-; Entry 14dc; block 17; address 15f5
-L14dc_17:
+; Entry 15d1; block 20; address 16ff
+L15d1_20:
   MOV EDI, 0x1
   NOP
-FOXDEC_TERMINATING_L14dc_17:
+FOXDEC_TERMINATING_L15d1_20:
   CALL exit wrt ..plt
 
-; Entry 14dc; block 16; address 15ff
-L14dc_16:
+; Entry 15d1; block 19; address 1709
+L15d1_19:
   ADD dword [RBP - 0x14], 0x1
 
-; Entry 14dc; block 18; address 1603
-L14dc_18:
+; Entry 15d1; block 21; address 170d
+L15d1_21:
   MOV EAX, dword [RBP - 0x18]
   CDQE
   LEA RDX, [RAX * 8]
@@ -621,90 +730,21 @@ L14dc_18:
   ADD RAX, RDX
   MOVZX EAX, byte [RAX]
   TEST AL, AL
-  JNZ L14dc_19    ; 0x1529 --> L14dc_19
+  JNZ L15d1_22    ; 0x1633 --> L15d1_22
 
-; Entry 14dc; block 20; address 162d
-L14dc_20:
+; Entry 15d1; block 23; address 1737
+L15d1_23:
   ADD dword [RBP - 0x18], 0x1
 
-; Entry 14dc; block 21; address 1631
-L14dc_21:
+; Entry 15d1; block 24; address 173b
+L15d1_24:
   MOV EAX, dword [RBP - 0x18]
   CMP EAX, dword [RBP - 0x24]
-  JL L14dc_22    ; 0x14fb --> L14dc_22
+  JGE L15d1_2    ; 0x1765 --> L15d1_2
 
-; Entry 14dc; block 23; address 163d
-L14dc_23:
-  JMP L14dc_24    ; 0x1640 --> L14dc_24
-
-; Entry 14dc; block 2; address 163f
-L14dc_2:
-  NOP ; NOP inserted
-
-; Entry 14dc; block 24; address 1640
-L14dc_24:
-  MOV EAX, dword [L_.bss_0x4050]    ; 0x4050 --> L_.bss_0x4050
-  TEST EAX, EAX
-  JNZ L14dc_26    ; 0x1690 --> L14dc_26
-
-; Entry 14dc; block 25; address 164a
-L14dc_25:
-  MOV EAX, dword [L_.bss_0x4054]    ; 0x4054 --> L_.bss_0x4054
-  TEST EAX, EAX
-  JNZ L14dc_26    ; 0x1690 --> L14dc_26
-
-; Entry 14dc; block 27; address 1654
-L14dc_27:
-  MOV EAX, dword [L_.bss_0x4058]    ; 0x4058 --> L_.bss_0x4058
-  TEST EAX, EAX
-  JNZ L14dc_26    ; 0x1690 --> L14dc_26
-
-; Entry 14dc; block 28; address 165e
-L14dc_28:
-  MOV EAX, dword [L_.bss_0x405c]    ; 0x405c --> L_.bss_0x405c
-  TEST EAX, EAX
-  JNZ L14dc_26    ; 0x1690 --> L14dc_26
-
-; Entry 14dc; block 29; address 1668
-L14dc_29:
-  MOV EAX, dword [L_.bss_0x4060]    ; 0x4060 --> L_.bss_0x4060
-  TEST EAX, EAX
-  JNZ L14dc_26    ; 0x1690 --> L14dc_26
-
-; Entry 14dc; block 30; address 1672
-L14dc_30:
-  MOV dword [L_.bss_0x4050], 0x1    ; 0x4050 --> L_.bss_0x4050
-  MOV dword [L_.bss_0x4054], 0x1    ; 0x4054 --> L_.bss_0x4054
-  MOV dword [L_.bss_0x405c], 0x1    ; 0x405c --> L_.bss_0x405c
-
-; Entry 14dc; block 26; address 1690
-L14dc_26:
-  MOV EAX, dword [RBP - 0x24]
-  SUB EAX, dword [RBP - 0x18]
-  MOV dword [RBP - 0xc], EAX
-  CMP dword [RBP - 0xc], 0x0
-  JNZ L14dc_32    ; 0x16b8 --> L14dc_32
-
-; Entry 14dc; block 31; address 169f
-L14dc_31:
-  MOV RAX, qword [stdin]    ; 0x4020 --> stdin
-  MOV ESI, 0x0
-  MOV RDI, RAX
-  CALL process_file    ; 0x1348 --> process_file
-
-; Entry 14dc; block 33; address 16b3
-L14dc_33:
-  JMP L14dc_46    ; 0x17ce --> L14dc_46
-
-; Entry 14dc; block 32; address 16b8
-L14dc_32:
+; Entry 15d1; block 1; address 1743
+L15d1_1:
   MOV EAX, dword [RBP - 0x18]
-  MOV dword [RBP - 0x10], EAX
-  JMP L14dc_44    ; 0x17c2 --> L14dc_44
-
-; Entry 14dc; block 45; address 16c3
-L14dc_45:
-  MOV EAX, dword [RBP - 0x10]
   CDQE
   LEA RDX, [RAX * 8]
   MOV RAX, qword [RBP - 0x30]
@@ -712,54 +752,120 @@ L14dc_45:
   MOV RAX, qword [RAX]
   MOVZX EAX, byte [RAX]
   CMP AL, 0x2d
-  JNZ L14dc_35    ; 0x1721 --> L14dc_35
+  JZ L15d1_25    ; 0x15f0 --> L15d1_25
 
-; Entry 14dc; block 34; address 16e1
-L14dc_34:
+; Entry 15d1; block 2; address 1765
+L15d1_2:
+  MOV EAX, dword [L_.bss_0x4050]    ; 0x4050 --> L_.bss_0x4050
+  TEST EAX, EAX
+  JNZ L15d1_27    ; 0x17b5 --> L15d1_27
+
+; Entry 15d1; block 26; address 176f
+L15d1_26:
+  MOV EAX, dword [L_.bss_0x4054]    ; 0x4054 --> L_.bss_0x4054
+  TEST EAX, EAX
+  JNZ L15d1_27    ; 0x17b5 --> L15d1_27
+
+; Entry 15d1; block 28; address 1779
+L15d1_28:
+  MOV EAX, dword [L_.bss_0x4058]    ; 0x4058 --> L_.bss_0x4058
+  TEST EAX, EAX
+  JNZ L15d1_27    ; 0x17b5 --> L15d1_27
+
+; Entry 15d1; block 29; address 1783
+L15d1_29:
+  MOV EAX, dword [L_.bss_0x405c]    ; 0x405c --> L_.bss_0x405c
+  TEST EAX, EAX
+  JNZ L15d1_27    ; 0x17b5 --> L15d1_27
+
+; Entry 15d1; block 30; address 178d
+L15d1_30:
+  MOV EAX, dword [L_.bss_0x4060]    ; 0x4060 --> L_.bss_0x4060
+  TEST EAX, EAX
+  JNZ L15d1_27    ; 0x17b5 --> L15d1_27
+
+; Entry 15d1; block 31; address 1797
+L15d1_31:
+  MOV dword [L_.bss_0x4050], 0x1    ; 0x4050 --> L_.bss_0x4050
+  MOV dword [L_.bss_0x4054], 0x1    ; 0x4054 --> L_.bss_0x4054
+  MOV dword [L_.bss_0x405c], 0x1    ; 0x405c --> L_.bss_0x405c
+
+; Entry 15d1; block 27; address 17b5
+L15d1_27:
+  MOV EAX, dword [RBP - 0x24]
+  SUB EAX, dword [RBP - 0x18]
+  MOV dword [RBP - 0xc], EAX
+  CMP dword [RBP - 0xc], 0x0
+  JNZ L15d1_33    ; 0x17dd --> L15d1_33
+
+; Entry 15d1; block 32; address 17c4
+L15d1_32:
+  MOV RAX, qword [stdin]    ; 0x4020 --> stdin
+  MOV ESI, 0x0
+  MOV RDI, RAX
+  CALL process_file    ; 0x1368 --> process_file
+
+; Entry 15d1; block 34; address 17d8
+L15d1_34:
+  JMP L15d1_47    ; 0x18e0 --> L15d1_47
+
+; Entry 15d1; block 33; address 17dd
+L15d1_33:
+  MOV EAX, dword [RBP - 0x18]
+  MOV dword [RBP - 0x10], EAX
+  JMP L15d1_45    ; 0x18d4 --> L15d1_45
+
+; Entry 15d1; block 46; address 17e8
+L15d1_46:
   MOV EAX, dword [RBP - 0x10]
   CDQE
   LEA RDX, [RAX * 8]
   MOV RAX, qword [RBP - 0x30]
   ADD RAX, RDX
   MOV RAX, qword [RAX]
-  ADD RAX, 0x1
-  MOVZX EAX, byte [RAX]
-  TEST AL, AL
-  JNZ L14dc_35    ; 0x1721 --> L14dc_35
-
-; Entry 14dc; block 36; address 1703
-L14dc_36:
-  MOV RAX, qword [stdin]    ; 0x4020 --> stdin
-  LEA RDX, [L_.rodata_0x201e]    ; 0x201e --> L_.rodata_0x201e
+  LEA RDX, [L_.rodata_0x230e]    ; 0x230e --> L_.rodata_0x230e
   MOV RSI, RDX
   MOV RDI, RAX
-  CALL process_file    ; 0x1348 --> process_file
+  CALL strcmp wrt ..plt
 
-; Entry 14dc; block 37; address 171c
-L14dc_37:
-  JMP L14dc_42    ; 0x17be --> L14dc_42
+; Entry 15d1; block 35; address 1811
+L15d1_35:
+  TEST EAX, EAX
+  JNZ L15d1_37    ; 0x1833 --> L15d1_37
 
-; Entry 14dc; block 35; address 1721
-L14dc_35:
+; Entry 15d1; block 36; address 1815
+L15d1_36:
+  MOV RAX, qword [stdin]    ; 0x4020 --> stdin
+  LEA RDX, [L_.rodata_0x2310]    ; 0x2310 --> L_.rodata_0x2310
+  MOV RSI, RDX
+  MOV RDI, RAX
+  CALL process_file    ; 0x1368 --> process_file
+
+; Entry 15d1; block 38; address 182e
+L15d1_38:
+  JMP L15d1_43    ; 0x18d0 --> L15d1_43
+
+; Entry 15d1; block 37; address 1833
+L15d1_37:
   MOV EAX, dword [RBP - 0x10]
   CDQE
   LEA RDX, [RAX * 8]
   MOV RAX, qword [RBP - 0x30]
   ADD RAX, RDX
   MOV RAX, qword [RAX]
-  LEA RDX, [L_.rodata_0x202d]    ; 0x202d --> L_.rodata_0x202d
+  LEA RDX, [L_.rodata_0x231f]    ; 0x231f --> L_.rodata_0x231f
   MOV RSI, RDX
   MOV RDI, RAX
   CALL fopen wrt ..plt
 
-; Entry 14dc; block 38; address 174a
-L14dc_38:
+; Entry 15d1; block 39; address 185c
+L15d1_39:
   MOV qword [RBP - 0x8], RAX
   CMP qword [RBP - 0x8], 0x0
-  JNZ L14dc_40    ; 0x178c --> L14dc_40
+  JNZ L15d1_41    ; 0x189e --> L15d1_41
 
-; Entry 14dc; block 39; address 1755
-L14dc_39:
+; Entry 15d1; block 40; address 1867
+L15d1_40:
   MOV EAX, dword [RBP - 0x10]
   CDQE
   LEA RDX, [RAX * 8]
@@ -767,18 +873,18 @@ L14dc_39:
   ADD RAX, RDX
   MOV RDX, qword [RAX]
   MOV RAX, qword [stderr]    ; 0x4040 --> stderr
-  LEA RCX, [L_.rodata_0x202f]    ; 0x202f --> L_.rodata_0x202f
+  LEA RCX, [L_.rodata_0x2321]    ; 0x2321 --> L_.rodata_0x2321
   MOV RSI, RCX
   MOV RDI, RAX
   MOV EAX, 0x0
   CALL fprintf wrt ..plt
 
-; Entry 14dc; block 41; address 178a
-L14dc_41:
-  JMP L14dc_42    ; 0x17be --> L14dc_42
+; Entry 15d1; block 42; address 189c
+L15d1_42:
+  JMP L15d1_43    ; 0x18d0 --> L15d1_43
 
-; Entry 14dc; block 40; address 178c
-L14dc_40:
+; Entry 15d1; block 41; address 189e
+L15d1_41:
   MOV EAX, dword [RBP - 0x10]
   CDQE
   LEA RDX, [RAX * 8]
@@ -788,43 +894,43 @@ L14dc_40:
   MOV RAX, qword [RBP - 0x8]
   MOV RSI, RDX
   MOV RDI, RAX
-  CALL process_file    ; 0x1348 --> process_file
+  CALL process_file    ; 0x1368 --> process_file
 
-; Entry 14dc; block 43; address 17b2
-L14dc_43:
+; Entry 15d1; block 44; address 18c4
+L15d1_44:
   MOV RAX, qword [RBP - 0x8]
   MOV RDI, RAX
   CALL fclose wrt ..plt
 
-; Entry 14dc; block 42; address 17be
-L14dc_42:
+; Entry 15d1; block 43; address 18d0
+L15d1_43:
   ADD dword [RBP - 0x10], 0x1
 
-; Entry 14dc; block 44; address 17c2
-L14dc_44:
+; Entry 15d1; block 45; address 18d4
+L15d1_45:
   MOV EAX, dword [RBP - 0x10]
   CMP EAX, dword [RBP - 0x24]
-  JL L14dc_45    ; 0x16c3 --> L14dc_45
+  JL L15d1_46    ; 0x17e8 --> L15d1_46
 
-; Entry 14dc; block 46; address 17ce
-L14dc_46:
+; Entry 15d1; block 47; address 18e0
+L15d1_47:
   CMP dword [RBP - 0xc], 0x1
-  JLE L14dc_48    ; 0x1809 --> L14dc_48
+  JLE L15d1_49    ; 0x191b --> L15d1_49
 
-; Entry 14dc; block 47; address 17d4
-L14dc_47:
+; Entry 15d1; block 48; address 18e6
+L15d1_48:
   MOV RDI, qword [L_.bss_0x4088]    ; 0x4088 --> L_.bss_0x4088
   MOV RCX, qword [L_.bss_0x4080]    ; 0x4080 --> L_.bss_0x4080
   MOV RDX, qword [L_.bss_0x4078]    ; 0x4078 --> L_.bss_0x4078
   MOV RSI, qword [L_.bss_0x4070]    ; 0x4070 --> L_.bss_0x4070
   MOV RAX, qword [L_.bss_0x4068]    ; 0x4068 --> L_.bss_0x4068
-  LEA R9, [L_.rodata_0x2044]    ; 0x2044 --> L_.rodata_0x2044
+  LEA R9, [L_.rodata_0x2336]    ; 0x2336 --> L_.rodata_0x2336
   MOV R8, RDI
   MOV RDI, RAX
-  CALL print_counts    ; 0x1249 --> print_counts
+  CALL print_counts    ; 0x1269 --> print_counts
 
-; Entry 14dc; block 48; address 1809
-L14dc_48:
+; Entry 15d1; block 49; address 191b
+L15d1_49:
   MOV EAX, 0x0
   LEAVE
   RET
@@ -835,7 +941,7 @@ L14dc_48:
 ; ---------------
 ; Function: _fini
 ; ---------------
-; Entry 1810; block 0; address 1810
+; Entry 1924; block 0; address 1924
 _fini:
   SUB RSP, 0x8
   ADD RSP, 0x8
@@ -844,42 +950,110 @@ _fini:
 
 
 
-section .rodata align=4 ; @2000
+section .rodata align=8 ; @2000
 L_.rodata_0x2000:
 db 01h
 db 00h
 db 02h
 db 00h
-L_.rodata_0x2004:
-db "%llu ", 0; @ 2004
-L_.rodata_0x200a:
-db "Invalid option -%c\n", 0; @ 200a
-L_.rodata_0x201e:
-db "standard input", 0; @ 201e
-L_.rodata_0x202d:
-db "r", 0; @ 202d
-L_.rodata_0x202f:
-db "Cannot open file %s\n", 0; @ 202f
-L_.rodata_0x2044:
-db "total", 0; @ 2044
-L_.rodata_END:
+db 00h
+db 00h
+db 00h
+db 00h
+L_.rodata_0x2008:
+db "%llu ", 0; @ 2008
+db 00h
+db 00h
+L_.rodata_0x2010:
+db "Usage: wc [OPTION]... [FILE]...", 0; @ 2010
+L_.rodata_0x2030:
+db "Print newline, word, and byte counts for each FILE, and a total line if", 0; @ 2030
+L_.rodata_0x2078:
+db "more than one FILE is specified.  A word is a nonempty sequence of non white", 0; @ 2078
+db 00h
+db 00h
+db 00h
+L_.rodata_0x20c8:
+db "space delimited by white space characters or by start or end of input.\n", 0; @ 20c8
+L_.rodata_0x2110:
+db "With no FILE, or when FILE is -, read standard input.\n", 0; @ 2110
+db 00h
+L_.rodata_0x2148:
+db "The options below may be used to select which counts are printed, always in", 0; @ 2148
+db 00h
+db 00h
+db 00h
+db 00h
+L_.rodata_0x2198:
+db "the following order: newline, word, character, byte, maximum line length.", 0; @ 2198
+db 00h
+db 00h
+db 00h
+db 00h
+db 00h
+db 00h
+L_.rodata_0x21e8:
+db "  -c            print the byte counts", 0; @ 21e8
+db 00h
+db 00h
+L_.rodata_0x2210:
+db "  -m            print the character counts", 0; @ 2210
+db 00h
+db 00h
+db 00h
+db 00h
+db 00h
+L_.rodata_0x2240:
+db "  -l            print the newline counts", 0; @ 2240
+db 00h
+db 00h
+db 00h
+db 00h
+db 00h
+db 00h
+db 00h
+L_.rodata_0x2270:
+db "  -L            print the maximum line length", 0; @ 2270
+db 00h
+db 00h
+L_.rodata_0x22a0:
+db "  -w            print the word counts", 0; @ 22a0
+db 00h
+db 00h
+L_.rodata_0x22c8:
+db "      --help    display this help and exit", 0; @ 22c8
+L_.rodata_0x22f3:
+db "--help", 0; @ 22f3
+L_.rodata_0x22fa:
+db "Invalid option -%c\n", 0; @ 22fa
+L_.rodata_0x230e:
+db "-", 0; @ 230e
+L_.rodata_0x2310:
+db "standard input", 0; @ 2310
+L_.rodata_0x231f:
+db "r", 0; @ 231f
+L_.rodata_0x2321:
+db "Cannot open file %s\n", 0; @ 2321
+L_.rodata_0x2336:
+db "total", 0; @ 2336
+__GNU_EH_FRAME_HDR:
 
-section .init_array align=8 ; @3d78
-L_.init_array_0x3d78:
-L_reloc_0x3d78_0x1240:
-dq frame_dummy    ; 0x1240 --> frame_dummy
+section .init_array align=8 ; @3d70
+L_.init_array_0x3d70:
+L_reloc_0x3d70_0x1260:
+dq frame_dummy    ; 0x1260 --> frame_dummy
 L_.init_array_END:
 
-section .fini_array align=8 ; @3d80
-L_.fini_array_0x3d80:
-L_reloc_0x3d80_0x1200:
-dq __do_global_dtors_aux    ; 0x1200 --> __do_global_dtors_aux
+section .fini_array align=8 ; @3d78
+L_.fini_array_0x3d78:
+L_reloc_0x3d78_0x1220:
+dq __do_global_dtors_aux    ; 0x1220 --> __do_global_dtors_aux
 L_.fini_array_END:
 
-section .got align=8 ; @3f78
-L_.got_0x3f78:
-db 088h
-db "=", 0; @ 3f79
+section .got align=8 ; @3f70
+L_.got_0x3f70:
+db 080h
+db "=", 0; @ 3f71
 db 00h
 db 00h
 db 00h
@@ -906,6 +1080,7 @@ dq puts    ;
 dq fclose    ; 
 dq printf    ; 
 dq fgetc    ; 
+dq strcmp    ; 
 dq fprintf    ; 
 dq fopen    ; 
 dq exit    ; 

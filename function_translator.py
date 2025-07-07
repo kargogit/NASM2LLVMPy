@@ -922,12 +922,10 @@ class FunctionTranslator:
                 section_name, label_offset = self.module_data.label_to_section_offset[operand.name]
                 if section_name in self.llvm_generator.section_globals:
                     section_global = self.llvm_generator.section_globals[section_name]
-                    access_type = self.get_operand_type(operand, context)
-                    element_size = self.get_type_size(access_type)
-                    base_ptr = context.builder.bitcast(section_global, ir.PointerType(access_type))
+                    base_ptr = context.builder.bitcast(section_global, ir.PointerType(ir.IntType(8)))
                     byte_offset = label_offset + (operand.displacement or 0)
-                    index = byte_offset // element_size
-                    offset_val = ir.Constant(ir.IntType(64), index)
+                    offset_val = ir.Constant(ir.IntType(64), byte_offset)
+                    context.builder.add(ir.Constant(ir.IntType(32), 0), ir.Constant(ir.IntType(32), 0), name=f"nop_marker3-{offset_val}-{label_offset}-{byte_offset}-{operand.name}")
                     return context.builder.gep(base_ptr, [offset_val], inbounds=True)
             elif operand.name:
                 global_var = self.module.get_global(operand.name)

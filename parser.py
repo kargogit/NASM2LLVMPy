@@ -56,6 +56,7 @@ class Parser:
                 name = self.get_symbol_name(line_element)
                 self.global_symbols.append(name)
 
+
     def parse_sections(self):
         sections = {}
         current_section = None
@@ -99,6 +100,9 @@ class Parser:
                         self.section_funcs.append(value)
                     current_data.append((size, value, dd_type))
                     offset += size
+                    if dd_type == "string":
+                        if '\0' not in value:
+                            offset += 1
 
         if current_section:
             current_section.data.extend(current_data)

@@ -128,8 +128,6 @@ class LLVMGenerator:
         current_offset = 0
 
         for size, value, dd_type in section.data:
-
-
             if dd_type == "integer":
                 if value is None:
                     data.extend([0] * size)
@@ -145,7 +143,8 @@ class LLVMGenerator:
                 if len(string_bytes) >= size:
                     data.extend(string_bytes[:size])
                 else:
-                    data.extend(string_bytes + [0] * (size - len(string_bytes)))
+                    data.extend(string_bytes)
+                    data.extend([0] * (size - len(string_bytes)))
                 current_offset += size
             elif dd_type == "name":
 
